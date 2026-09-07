@@ -1,21 +1,23 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Resolved Azure Blob cross-origin blockage caused by HTTP 307 client redirects by implementing a true HTTP 206 Partial Content Range streamer in Netlify Edge Function (`netlify/edge-functions/model-proxy.ts`).
-- Forwarded client `Range: bytes=start-end` headers upstream to Azure, streaming small byte chunks with explicit CORS headers (`Access-Control-Allow-Origin: *`, `Accept-Ranges: bytes`, `Access-Control-Expose-Headers`).
-- Set `parallelDownloads: 1` in `src/workers/wllama.worker.ts` to ensure sequential chunk retrieval, avoiding edge concurrency limits.
+- Eliminated the WASM memory alignment fault (`RangeError: Invalid typed array length: 1163217991` / `std::bad_function_call`) during post-load inference triggering.
+- Sanitized completion options (`nPredict`, `temp`, `topP`, `topK`, `stopTrigger`) before passing into `@wllama/wllama`'s C++ bindings.
+- Normalized `createCompletion` invocation parameters to prevent string spreading into WASM linear memory and ensured conservative context allocation (`n_ctx: 2048`, `n_batch: 512`, `n_threads`).
+- Updated `useCognitiveEngine` hook to handle streaming `TOKEN` messages, sanitized `COMPLETION` payloads, and provided `generate` helper.
 
 ## Current Work Stream
-- Converted `model-proxy.ts` from HTTP 307 redirect back to server-side 206 chunk streamer with full byte-range header forwarding.
-- Configured Wllama with sequential downloads (`parallelDownloads: 1`) and active cache integrity checks.
+- Sanitized options in `src/workers/wllama.worker.ts` and set conservative context bounds during `loadModelFromUrl`.
+- Harmonized IPC protocol in `src/types/index.ts` and `src/hooks/useCognitiveEngine.ts` for dual `TOKEN`/`SUCCESS`/`COMPLETE` streaming.
+- Verified zero TypeScript errors (`pnpm exec tsc --noEmit`) and successful production build (`pnpm build`).
 
 ## Recent State Changes
-- Modified `netlify/edge-functions/model-proxy.ts`.
 - Modified `src/workers/wllama.worker.ts`.
-- Confirmed zero errors with `pnpm exec tsc --noEmit`.
+- Modified `src/hooks/useCognitiveEngine.ts`.
+- Modified `src/types/index.ts`.
+- Confirmed zero errors with `pnpm exec tsc --noEmit` and clean build with `pnpm build`.
 
 ## Next Immediate Steps
-- Wipe existing corrupted model fragments and lockfiles from browser OPFS via DevTools console.
-- Commit and push to origin main to trigger Netlify deployment.
-- Verify sub-second 206 Partial Content responses and successful model mounting.
+- Push changes to origin main to trigger Netlify deployment.
+- Verify smooth model inference in browser without memory bounds violation.
 

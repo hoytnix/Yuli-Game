@@ -91,7 +91,7 @@ export type WllamaInboundMessage =
   | { type: 'INIT_MODEL'; payload: { modelUrl?: string; customBlob?: Blob } }
   | { type: 'INIT'; payload?: { modelUrl?: string; customBlob?: Blob } }
   | { type: 'GENERATE'; payload: { id: string; prompt: string; intimacyScore?: number; partnerFacts?: string[] } }
-  | { type: 'COMPLETION'; payload?: { prompt: string; options?: any } }
+  | { type: 'COMPLETION'; payload?: { id?: string; prompt: string; options?: any; intimacyScore?: number; partnerFacts?: string[] } }
   | { type: 'ABORT' }
   | { type: 'CHECK_STATUS' };
 
@@ -99,7 +99,7 @@ export type WllamaOutboundMessage =
   | { type: 'STATUS_UPDATE'; payload: Partial<ModelLoadProgress> }
   | { type: 'READY'; payload?: { isMultithread?: boolean } }
   | { type: 'PROGRESS'; payload: { loaded: number; total: number; percentage: number } }
-  | { type: 'TOKEN'; payload: { id: string; token: string; rawAccumulated: string } }
+  | { type: 'TOKEN'; payload: { id?: string; token?: string | number; piece?: string; currentText?: string; rawAccumulated?: string } }
   | {
       type: 'COMPLETE';
       payload: {

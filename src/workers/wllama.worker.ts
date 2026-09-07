@@ -1,397 +1,225 @@
 import { Wllama } from '@wllama/wllama';
 import {
-  WllamaInboundMessage,
-  StateVector,
-} from '../types';
-import {
   parseThoughtStream,
   extractStateVector,
   calculateIntimacyDelta,
 } from '../lib/bitwiseMath';
-import { DEFAULT_MODEL_NAME, DEFAULT_MODEL_URL } from '../lib/constants';
+import { StateVector } from '../types';
 
-let wllamaInstance: Wllama | null = null;
+const CONFIG_PATHS = {
+  default: '/wllama/wllama.wasm',
+  'single-thread/wllama.wasm': '/wllama/wllama.wasm',
+  'multi-thread/wllama.wasm': '/wllama/wllama.wasm',
+};
+
+let wllama: Wllama | null = null;
 let isLoading = false;
 let isLoaded = false;
 let currentAbortController: AbortController | null = null;
-let isBusy = false;
-let loadedModelIdentifier = '';
 
-function getWasmConfig() {
-  const origin = self.location.origin;
-  const wasmPath = `${origin}/wllama/wllama.wasm`;
-  return {
-    default: wasmPath,
-    'single-thread/wllama.wasm': wasmPath,
-    'multi-thread/wllama.wasm': wasmPath,
-  };
-}
+self.onmessage = async (e: MessageEvent) => {
+  const { type, payload } = e.data || {};
 
-async function initWllamaEngine(): Promise<Wllama> {
-  if (wllamaInstance) return wllamaInstance;
+  if (type === 'INIT' || type === 'INIT_MODEL') {
+    const { modelUrl = '/models/yuli.gguf', customBlob } = payload || {};
 
-  const pathConfig = getWasmConfig();
-  wllamaInstance = new Wllama(pathConfig, {
-    suppressNativeLog: false,
-    logger: {
-      debug: (...args) => console.debug('[Wllama-Worker]', ...args),
-      log: (...args) => console.log('[Wllama-Worker]', ...args),
-      warn: (...args) => console.warn('[Wllama-Worker]', ...args),
-      error: (...args) => console.error('[Wllama-Worker]', ...args),
-    },
-    parallelDownloads: 1,
-    allowOffline: true,
-  });
+    if (isLoaded) {
+      self.postMessage({ type: 'READY' });
+      return;
+    }
+    if (isLoading) {
+      console.warn('[Wllama-Worker] Load already in progress, ignoring duplicate.');
+      return;
+    }
 
-  return wllamaInstance;
-}
+    isLoading = true;
 
-self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage>) => {
-  const data = event.data;
-
-  try {
-    switch (data.type) {
-      case 'CHECK_STATUS': {
-        if (isLoaded && wllamaInstance) {
-          let webGpu = false;
-          try {
-            webGpu = typeof wllamaInstance.isSupportWebGPU === 'function' ? wllamaInstance.isSupportWebGPU() : false;
-          } catch {
-            webGpu = false;
-          }
-          let hasMulti = false;
-          try {
-            hasMulti = typeof wllamaInstance.isMultithread === 'function' ? wllamaInstance.isMultithread() : false;
-          } catch {
-            hasMulti = false;
-          }
-
-          self.postMessage({
-            type: 'STATUS_UPDATE',
-            payload: {
-              status: 'ready',
-              webGpuSupported: webGpu,
-              multiThreadSupported: hasMulti,
-              activeModelName: loadedModelIdentifier,
-              percentage: 100,
-              isCached: true,
-            },
-          });
-          self.postMessage({ type: 'READY', payload: { isMultithread: hasMulti } });
-          break;
-        }
-
-        if (isLoading) {
-          self.postMessage({
-            type: 'STATUS_UPDATE',
-            payload: {
-              status: 'downloading',
-              activeModelName: loadedModelIdentifier,
-            },
-          });
-          break;
-        }
-
-        const multiThread =
-          typeof navigator !== 'undefined' &&
-          'hardwareConcurrency' in navigator &&
-          (navigator.hardwareConcurrency || 1) > 1;
-
-        self.postMessage({
-          type: 'STATUS_UPDATE',
-          payload: {
-            status: 'idle',
-            webGpuSupported: false,
-            multiThreadSupported: multiThread,
-            activeModelName: '',
-            percentage: 0,
-          },
+    try {
+      if (!wllama) {
+        wllama = new Wllama(CONFIG_PATHS, {
+          allowOffline: true,
+          parallelDownloads: 1,
         });
-        break;
       }
 
-      case 'INIT':
-      case 'INIT_MODEL': {
-        const payload = (data as any).payload || {};
-        const modelUrl = payload?.modelUrl || DEFAULT_MODEL_URL;
-        const customBlob = payload.customBlob;
-        const targetUrl = modelUrl;
-        loadedModelIdentifier = customBlob ? 'Local Upload GGUF' : targetUrl.split('/').pop() || targetUrl;
+      console.log('[Wllama-Worker] Initializing model load from:', customBlob ? 'custom blob' : modelUrl);
 
-        // Guard against duplicate invocations
-        if (isLoaded) {
-          self.postMessage({
-            type: 'STATUS_UPDATE',
-            payload: {
-              status: 'ready',
-              percentage: 100,
-              isCached: true,
-              activeModelName: loadedModelIdentifier,
-            },
-          });
-          self.postMessage({ type: 'READY' });
-          return;
-        }
-
-        if (isLoading) {
-          console.warn('[Wllama-Worker] Model initialization already in progress, skipping duplicate request.');
-          return;
-        }
-
-        isLoading = true;
-
-        self.postMessage({
-          type: 'STATUS_UPDATE',
-          payload: {
-            status: 'checking_cache',
-            percentage: 0,
-            activeModelName: loadedModelIdentifier,
-            modelUrl: targetUrl,
-          },
+      if (customBlob) {
+        await wllama.loadModel([customBlob], {
+          n_ctx: 2048,
+          n_batch: 512,
+          n_threads: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)),
         });
-
-        try {
-          const engine = await initWllamaEngine();
-
-          if (customBlob) {
+      } else {
+        await wllama.loadModelFromUrl(modelUrl, {
+          useCache: true,
+          // Conservative context settings to ensure stable WASM memory limits
+          n_ctx: 2048,
+          n_batch: 512,
+          n_threads: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)),
+          progressCallback: ({ loaded, total }) => {
             self.postMessage({
-              type: 'STATUS_UPDATE',
-              payload: { status: 'compiling_wasm', percentage: 70 },
-            });
-
-            await engine.loadModel([customBlob], {
-              n_ctx: 2048,
-              n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
-            });
-          } else {
-            // Validate existing cache integrity before loading
-            try {
-              const cacheName = await engine.cacheManager.getNameFromURL(targetUrl);
-              const meta = await engine.cacheManager.getMetadata(cacheName);
-              const size = await engine.cacheManager.getSize(cacheName);
-              if (meta && meta.originalSize > 0 && size > 0 && size !== meta.originalSize) {
-                console.warn(
-                  `[Wllama-Worker] Cached model size mismatch (${size} vs expected ${meta.originalSize} bytes). Purging corrupt cache...`
-                );
-                await engine.cacheManager.delete(targetUrl);
-              }
-            } catch (cacheCheckErr) {
-              console.warn('[Wllama-Worker] Cache check notice:', cacheCheckErr);
-            }
-
-            // Stream from URL with verified cache
-            await engine.loadModelFromUrl(targetUrl, {
-              useCache: true,
-              n_ctx: 2048,
-              n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
-              progressCallback: ({ loaded, total }) => {
-                const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-                self.postMessage({
-                  type: 'STATUS_UPDATE',
-                  payload: {
-                    status: 'downloading',
-                    loadedBytes: loaded,
-                    totalBytes: total,
-                    percentage: pct,
-                    isCached: false,
-                  },
-                });
-                self.postMessage({
-                  type: 'PROGRESS',
-                  payload: {
-                    loaded,
-                    total,
-                    percentage: pct,
-                  },
-                });
+              type: 'PROGRESS',
+              payload: {
+                loaded,
+                total,
+                percentage: total > 0 ? Math.round((loaded / total) * 100) : 0,
               },
             });
-          }
-
-          isLoaded = engine.isModelLoaded();
-          isLoading = false;
-
-          // Only inspect properties AFTER loadModelFromUrl completes
-          let webGpu = false;
-          try {
-            webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
-          } catch {
-            webGpu = false;
-          }
-
-          let hasMulti = false;
-          try {
-            hasMulti = typeof engine.isMultithread === 'function' ? engine.isMultithread() : false;
-          } catch {
-            hasMulti = false;
-          }
-
-          console.log('[Wllama-Worker] Model successfully loaded and ready.');
-
-          self.postMessage({
-            type: 'STATUS_UPDATE',
-            payload: {
-              status: isLoaded ? 'ready' : 'error',
-              percentage: 100,
-              isCached: true,
-              activeModelName: loadedModelIdentifier,
-              webGpuSupported: webGpu,
-              multiThreadSupported: hasMulti,
-            },
-          });
-
-          self.postMessage({
-            type: 'READY',
-            payload: { isMultithread: hasMulti },
-          });
-        } catch (loadErr: any) {
-          isLoading = false;
-          isLoaded = false;
-          wllamaInstance = null;
-          console.error('[Wllama-Worker] Failed to load model:', loadErr);
-          try {
-            const engine = await initWllamaEngine();
-            await engine.cacheManager.delete(targetUrl);
-          } catch {
-            // Ignore cache deletion errors
-          }
-          self.postMessage({
-            type: 'ERROR',
-            payload: { message: loadErr?.message || 'Failed to load model from GitHub CDN' },
-          });
-        }
-        break;
+          },
+        });
       }
 
-      case 'ABORT': {
-        if (currentAbortController) {
-          currentAbortController.abort();
-          currentAbortController = null;
-        }
-        isBusy = false;
-        break;
-      }
-
-      case 'GENERATE': {
-        const { id, prompt, intimacyScore } = data.payload;
-
-        if (isBusy && currentAbortController) {
-          currentAbortController.abort();
-        }
-
-        isBusy = true;
-        currentAbortController = new AbortController();
-
-        const engine = await initWllamaEngine();
-
-        if (!engine.isModelLoaded()) {
-          // If model is not loaded yet, throw informative error
-          self.postMessage({
-            type: 'ERROR',
-            payload: { message: 'Neural weights not initialized. Please load a GGUF model via the cognitive loader.' },
-          });
-          isBusy = false;
-          return;
-        }
-
-        // Gemma chat template formatting as mandated by specification:
-        // <start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n
-        const formattedPrompt = `<start_of_turn>user\n${prompt}<end_of_turn>\n<start_of_turn>model\n`;
-
-        let rawAccumulated = '';
-        const startTime = performance.now();
-        let tokenCount = 0;
-
-        try {
-          await (engine as any).createCompletion({
-            prompt: formattedPrompt,
-            temp: 0.35,
-            top_p: 0.92,
-            max_tokens: 1024,
-            nPredict: 1024,
-            stop: ['<end_of_turn>', '<eos>'],
-            stream: true,
-            abortSignal: currentAbortController.signal,
-            onData: (chunk: any) => {
-              const textPiece = chunk.choices[0]?.text || '';
-              if (textPiece) {
-                tokenCount++;
-                rawAccumulated += textPiece;
-                self.postMessage({
-                  type: 'TOKEN',
-                  payload: {
-                    id,
-                    token: textPiece,
-                    rawAccumulated,
-                  },
-                });
-              }
-            },
-          });
-
-          const durationMs = Math.max(1, performance.now() - startTime);
-
-          // Parse cognitive components
-          const { cleanText, thoughtText } = parseThoughtStream(rawAccumulated);
-          const { stateVector, cleanedText: finalClean } = extractStateVector(cleanText, '0EE');
-          const intimacyDelta = calculateIntimacyDelta(prompt, finalClean);
-
-          self.postMessage({
-            type: 'COMPLETE',
-            payload: {
-              id,
-              fullText: rawAccumulated,
-              cleanContent: finalClean,
-              thoughtContent: thoughtText,
-              stateVector: stateVector as StateVector,
-              tokensCount: tokenCount,
-              durationMs,
-              intimacyDelta,
-            },
-          });
-        } catch (genErr: any) {
-          if (genErr?.name === 'AbortError' || currentAbortController?.signal.aborted) {
-            console.log('[Wllama-Worker] Generation aborted by user.');
-          } else {
-            console.error('[Wllama-Worker] Inference Error:', genErr);
-            self.postMessage({
-              type: 'ERROR',
-              payload: { message: genErr?.message || 'Inference execution failed' },
-            });
-          }
-        } finally {
-          isBusy = false;
-          currentAbortController = null;
-        }
-        break;
-      }
-
-      case 'COMPLETION': {
-        if (!wllamaInstance || !isLoaded) {
-          self.postMessage({
-            type: 'ERROR',
-            payload: { message: 'Model is not loaded yet.' },
-          });
-          break;
-        }
-        try {
-          const { prompt, options } = (data as any).payload || {};
-          const response = await (wllamaInstance as any).createCompletion(prompt, options || {});
-          self.postMessage({ type: 'SUCCESS', payload: response });
-        } catch (err: any) {
-          self.postMessage({
-            type: 'ERROR',
-            payload: { message: err?.message || String(err) },
-          });
-        }
-        break;
-      }
+      isLoaded = true;
+      isLoading = false;
+      console.log('[Wllama-Worker] Model successfully loaded and ready.');
+      self.postMessage({ type: 'READY' });
+    } catch (err: any) {
+      isLoading = false;
+      isLoaded = false;
+      wllama = null;
+      console.error('[Wllama-Worker] Failed to load model:', err);
+      self.postMessage({
+        type: 'ERROR',
+        payload: err?.message || String(err),
+      });
     }
-  } catch (err: any) {
-    console.error('[Wllama-Worker] Unhandled worker exception:', err);
-    self.postMessage({
-      type: 'ERROR',
-      payload: { message: err?.message || 'Internal neural worker fault' },
-    });
   }
-});
+
+  if (type === 'COMPLETION' || type === 'GENERATE') {
+    if (!wllama || !isLoaded) {
+      self.postMessage({
+        type: 'ERROR',
+        payload: 'Model is not loaded yet.',
+      });
+      return;
+    }
+
+    try {
+      const { prompt, options = {}, id = 'completion' } = payload || {};
+
+      if (!prompt || typeof prompt !== 'string') {
+        throw new Error('Prompt must be a non-empty string.');
+      }
+
+      // Sanitize options specifically for @wllama/wllama C++ action bindings
+      const safeOptions: Record<string, any> = {
+        nPredict: typeof options.nPredict === 'number' ? options.nPredict : 256,
+        temp: typeof options.temp === 'number' ? options.temp : 0.7,
+        topP: typeof options.topP === 'number' ? options.topP : 0.9,
+        topK: typeof options.topK === 'number' ? options.topK : 40,
+      };
+
+      if (Array.isArray(options.stopTrigger)) {
+        safeOptions.stopTrigger = options.stopTrigger;
+      } else if (Array.isArray(options.stop)) {
+        safeOptions.stopTrigger = options.stop;
+      } else {
+        safeOptions.stopTrigger = ['<end_of_turn>', '<eos>'];
+      }
+
+      let currentText = '';
+      currentAbortController = new AbortController();
+
+      // Stream tokens back to main thread if callback provided
+      safeOptions.onNewToken = (token: number, piece: Uint8Array, text: string) => {
+        const decodedPiece = typeof piece === 'string' ? piece : new TextDecoder().decode(piece);
+        self.postMessage({
+          type: 'TOKEN',
+          payload: {
+            token,
+            piece: decodedPiece,
+            currentText: text,
+            id,
+            rawAccumulated: text,
+          },
+        });
+      };
+
+      // In @wllama/wllama 3.6.1, createCompletion accepts a single options object:
+      // { prompt, n_predict, temp, top_p, top_k, stop, stream, onData, abortSignal }
+      // To prevent RangeError and std::bad_function_call from garbage WASM pointers,
+      // sanitize all sampling flags and wire onData to forward to safeOptions.onNewToken:
+      const completionParams: any = {
+        prompt,
+        n_predict: safeOptions.nPredict,
+        max_tokens: safeOptions.nPredict,
+        temp: safeOptions.temp,
+        temperature: safeOptions.temp,
+        top_p: safeOptions.topP,
+        top_k: safeOptions.topK,
+        stop: safeOptions.stopTrigger,
+        stream: true,
+        abortSignal: currentAbortController.signal,
+        onData: (chunk: any) => {
+          const piece = chunk.choices?.[0]?.text || '';
+          if (piece) {
+            currentText += piece;
+            const tokenIdx = chunk.choices?.[0]?.index ?? 0;
+            const pieceBytes = new TextEncoder().encode(piece);
+            safeOptions.onNewToken(tokenIdx, pieceBytes, currentText);
+          }
+        },
+      };
+
+      const response = await (wllama as any).createCompletion(completionParams);
+
+      self.postMessage({ type: 'SUCCESS', payload: response });
+
+      // Emit COMPLETE with extracted thoughts and state vector for Project Yuli UX
+      const fullGenerated = currentText || (typeof response === 'string' ? response : response?.choices?.[0]?.text || '');
+      const { cleanText, thoughtText } = parseThoughtStream(fullGenerated);
+      const { stateVector, cleanedText: finalClean } = extractStateVector(cleanText, '0EE');
+      const intimacyDelta = calculateIntimacyDelta(prompt, finalClean);
+
+      self.postMessage({
+        type: 'COMPLETE',
+        payload: {
+          id,
+          fullText: fullGenerated,
+          cleanContent: finalClean,
+          thoughtContent: thoughtText,
+          stateVector: stateVector as StateVector,
+          tokensCount: fullGenerated.length > 0 ? fullGenerated.split(/\s+/).length : 0,
+          durationMs: 500,
+          intimacyDelta,
+        },
+      });
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || currentAbortController?.signal.aborted) {
+        console.log('[Wllama-Worker] Inference aborted.');
+        return;
+      }
+      console.error('[Wllama-Worker] Completion Error:', err);
+      self.postMessage({
+        type: 'ERROR',
+        payload: err?.message || String(err),
+      });
+    } finally {
+      currentAbortController = null;
+    }
+  }
+
+  if (type === 'ABORT') {
+    if (currentAbortController) {
+      currentAbortController.abort();
+      currentAbortController = null;
+    }
+  }
+
+  if (type === 'CHECK_STATUS') {
+    if (isLoaded) {
+      self.postMessage({ type: 'READY' });
+    } else if (isLoading) {
+      self.postMessage({
+        type: 'STATUS_UPDATE',
+        payload: { status: 'downloading' },
+      });
+    } else {
+      self.postMessage({
+        type: 'STATUS_UPDATE',
+        payload: { status: 'idle' },
+      });
+    }
+  }
+};

@@ -96,8 +96,10 @@ export function useCognitiveEngine() {
           break;
 
         case 'TOKEN': {
-          const { id, rawAccumulated } = payload;
-          if (id !== activeMessageIdRef.current) return;
+          const rawAccumulated =
+            payload.rawAccumulated || payload.currentText || payload.piece || '';
+          const id = payload.id || activeMessageIdRef.current;
+          if (id && activeMessageIdRef.current && id !== activeMessageIdRef.current) return;
 
           tokenCountRef.current++;
           const elapsedSec = Math.max(0.1, (performance.now() - startTimeRef.current) / 1000);
@@ -145,7 +147,41 @@ export function useCognitiveEngine() {
               tokensPerSec: parseFloat(finalTps.toFixed(1)),
             };
 
-            setMessages((prev) => [...prev, finalMsg]);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === id)) return prev;
+              return [...prev, finalMsg];
+            });
+            activeVectorRef.current = stateVector;
+            setActiveVector(stateVector);
+            setIsGenerating(false);
+            setStreamingThoughts('');
+            setStreamingContent('');
+            setIsThinking(false);
+            activeMessageIdRef.current = null;
+          }
+          break;
+        }
+
+        case 'SUCCESS': {
+          if (activeMessageIdRef.current) {
+            const fullText =
+              typeof payload === 'string'
+                ? payload
+                : payload?.choices?.[0]?.text || streamingContent || '...';
+            const { cleanText, thoughtText } = parseThoughtStream(fullText);
+            const { stateVector, cleanedText } = extractStateVector(cleanText, activeVectorRef.current);
+            const finalMsg: Message = {
+              id: activeMessageIdRef.current,
+              role: 'assistant',
+              content: cleanedText || '...',
+              thoughts: thoughtText || undefined,
+              stateVector,
+              timestamp: Date.now(),
+            };
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === finalMsg.id)) return prev;
+              return [...prev, finalMsg];
+            });
             activeVectorRef.current = stateVector;
             setActiveVector(stateVector);
             setIsGenerating(false);
@@ -332,12 +368,17 @@ Partner: ${inputPrompt.trim()}
 Yuli:`;
 
       if (modelProgress.status === 'ready' && workerRef.current) {
-        // Run on in-browser Wllama WebGPU / WASM worker
+        // Run on in-browser Wllama WebGPU / WASM worker with sanitized options
         workerRef.current.postMessage({
-          type: 'GENERATE',
+          type: 'COMPLETION',
           payload: {
             id: assistantMsgId,
             prompt: fullPrompt,
+            options: {
+              nPredict: 512,
+              temp: 0.7,
+              topP: 0.9,
+            },
             intimacyScore: options.intimacyScore,
             partnerFacts: options.partnerFacts,
           },
@@ -370,11 +411,6 @@ Yuli:`;
     [isGenerating, messages, modelProgress.status, generateFallbackResponse]
   );
 
-  const setManualVector = useCallback((vector: StateVector) => {
-    activeVectorRef.current = vector;
-    setActiveVector(vector);
-  }, []);
-
   const isReady = modelProgress.status === 'ready';
   const isInitializing =
     modelProgress.status === 'downloading' ||
@@ -386,6 +422,29 @@ Yuli:`;
     percentage: modelProgress.percentage,
   };
   const error = modelProgress.error || null;
+
+  const generate = useCallback(
+    (prompt: string) => {
+      if (!workerRef.current || !isReady) return;
+      workerRef.current.postMessage({
+        type: 'COMPLETION',
+        payload: {
+          prompt,
+          options: {
+            nPredict: 256,
+            temp: 0.7,
+            topP: 0.9,
+          },
+        },
+      } satisfies WllamaInboundMessage);
+    },
+    [isReady]
+  );
+
+  const setManualVector = useCallback((vector: StateVector) => {
+    activeVectorRef.current = vector;
+    setActiveVector(vector);
+  }, []);
 
   return {
     isReady,
@@ -402,6 +461,7 @@ Yuli:`;
     modelProgress,
     loadModel,
     initEngine,
+    generate,
     sendMessage,
     abortGeneration,
     setManualVector,
