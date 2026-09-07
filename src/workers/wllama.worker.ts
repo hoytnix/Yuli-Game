@@ -5,6 +5,7 @@ import {
   calculateIntimacyDelta,
 } from '../lib/bitwiseMath';
 import { StateVector } from '../types';
+import { DEFAULT_MODEL_NAME, HF_MODEL_URL } from '../lib/constants';
 
 const CONFIG_PATHS = {
   default: '/wllama/wllama.wasm',
@@ -15,19 +16,76 @@ const CONFIG_PATHS = {
 let wllama: Wllama | null = null;
 let isLoading = false;
 let isLoaded = false;
+let activeModelName: string = DEFAULT_MODEL_NAME;
 let currentAbortController: AbortController | null = null;
+
+/**
+ * Read cached model weights directly from Origin Private File System (OPFS).
+ * Checks root directory, 'models' subdirectory, and Wllama's 'cache' directory.
+ */
+async function readModelFromOPFS(filename: string): Promise<Blob | File | null> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.getDirectory) return null;
+    const root = await navigator.storage.getDirectory();
+
+    // 1. Check root directory
+    try {
+      const handle = await root.getFileHandle(filename);
+      return await handle.getFile();
+    } catch {}
+
+    // 2. Check 'models' subdirectory
+    try {
+      const modelsDir = await root.getDirectoryHandle('models');
+      const handle = await modelsDir.getFileHandle(filename);
+      return await handle.getFile();
+    } catch {}
+
+    // 3. Check 'cache' directory (Wllama OPFS cache backend)
+    try {
+      const cacheDir = await root.getDirectoryHandle('cache');
+      // @ts-ignore
+      for await (const [name, handle] of cacheDir.entries()) {
+        if (handle.kind === 'file' && (name === filename || name.endsWith(`_${filename}`))) {
+          return await (handle as FileSystemFileHandle).getFile();
+        }
+      }
+    } catch {}
+
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 self.onmessage = async (e: MessageEvent) => {
   const { type, payload } = e.data || {};
 
   if (type === 'INIT' || type === 'INIT_MODEL') {
     const {
-      modelUrl = 'https://huggingface.co/colaformybatteries/yuli-0.1.0-e2b/resolve/main/yuli-0.1.0-e2b.Q4_K_M.gguf',
+      modelUrl = HF_MODEL_URL,
       customBlob,
+      modelPath,
+      modelName: explicitModelName,
     } = payload || {};
 
+    const targetModelName =
+      explicitModelName ||
+      modelPath ||
+      (customBlob instanceof File ? customBlob.name : null) ||
+      (modelUrl ? modelUrl.split('/').pop()?.split('?')[0] : null) ||
+      DEFAULT_MODEL_NAME;
+
+    activeModelName = targetModelName;
+
     if (isLoaded && wllama?.isModelLoaded()) {
-      self.postMessage({ type: 'READY' });
+      self.postMessage({
+        type: 'READY',
+        payload: {
+          isMultithread: wllama.isMultithread(),
+          activeModelName,
+        },
+      });
       return;
     }
     if (isLoading) {
@@ -51,37 +109,60 @@ self.onmessage = async (e: MessageEvent) => {
         parallelDownloads: 1,
       });
 
-      console.log('[Wllama-Worker] Loading model from URL:', customBlob ? 'custom blob' : modelUrl);
+      // Check if file is provided or already available in OPFS
+      let modelSourceBlob: Blob | null = customBlob || null;
+      if (!modelSourceBlob) {
+        try {
+          modelSourceBlob = await readModelFromOPFS(targetModelName);
+          if (modelSourceBlob) {
+            console.log(`[Wllama-Worker] Found model ${targetModelName} in local OPFS storage.`);
+          }
+        } catch (e) {
+          console.warn('[Wllama-Worker] OPFS lookup warning:', e);
+        }
+      }
 
-      if (customBlob) {
-        await wllama.loadModel([customBlob], {
+      if (modelSourceBlob) {
+        console.log(`[Wllama-Worker] Loading model directly from local Blob/OPFS: ${targetModelName}`);
+        const fileToLoad =
+          modelSourceBlob instanceof File
+            ? modelSourceBlob
+            : new File([modelSourceBlob], targetModelName, { type: 'application/octet-stream' });
+
+        await wllama.loadModel([fileToLoad], {
+          pathModel: targetModelName,
+          identifier: targetModelName,
           n_ctx: 2048,
           n_batch: 512,
           n_threads: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)),
-        });
+        } as any);
       } else {
+        console.log(`[Wllama-Worker] Loading model from URL: ${modelUrl} (target: ${targetModelName})`);
         await wllama.loadModelFromUrl(modelUrl, {
+          pathModel: targetModelName,
+          identifier: targetModelName,
           useCache: true,
           n_ctx: 2048,
           n_batch: 512,
           n_threads: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)),
-          progressCallback: ({ loaded, total }) => {
+          progressCallback: ({ loaded, total }: { loaded: number; total: number }) => {
             self.postMessage({
               type: 'PROGRESS',
               payload: {
                 loaded,
                 total,
                 percentage: total > 0 ? Math.round((loaded / total) * 100) : 0,
+                activeModelName: targetModelName,
               },
             });
           },
-        });
+        } as any);
       }
 
       // Crucial: Verify that C++ runtime actually initialized the model
       if (!wllama.isModelLoaded()) {
         try {
-          if (!customBlob) {
+          if (!modelSourceBlob) {
             await wllama.cacheManager?.delete(modelUrl);
           }
         } catch (_) {}
@@ -90,8 +171,14 @@ self.onmessage = async (e: MessageEvent) => {
 
       isLoaded = true;
       isLoading = false;
-      console.log('[Wllama-Worker] Model successfully loaded and ready.');
-      self.postMessage({ type: 'READY' });
+      console.log(`[Wllama-Worker] Model ${targetModelName} successfully loaded and ready.`);
+      self.postMessage({
+        type: 'READY',
+        payload: {
+          isMultithread: wllama.isMultithread(),
+          activeModelName: targetModelName,
+        },
+      });
     } catch (err: any) {
       isLoading = false;
       isLoaded = false;
@@ -239,16 +326,22 @@ self.onmessage = async (e: MessageEvent) => {
 
   if (type === 'CHECK_STATUS') {
     if (isLoaded && wllama?.isModelLoaded()) {
-      self.postMessage({ type: 'READY' });
+      self.postMessage({
+        type: 'READY',
+        payload: {
+          isMultithread: wllama.isMultithread(),
+          activeModelName,
+        },
+      });
     } else if (isLoading) {
       self.postMessage({
         type: 'STATUS_UPDATE',
-        payload: { status: 'downloading' },
+        payload: { status: 'downloading', activeModelName },
       });
     } else {
       self.postMessage({
         type: 'STATUS_UPDATE',
-        payload: { status: 'idle' },
+        payload: { status: 'idle', activeModelName },
       });
     }
   }

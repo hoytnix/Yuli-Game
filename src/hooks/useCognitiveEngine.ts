@@ -52,7 +52,7 @@ export function useCognitiveEngine() {
     isCached: false,
     webGpuSupported: false,
     multiThreadSupported: true,
-    activeModelName: '',
+    activeModelName: DEFAULT_MODEL_NAME,
   });
 
   const workerRef = useRef<Worker | null>(null);
@@ -84,6 +84,7 @@ export function useCognitiveEngine() {
             error: undefined,
             isCached: true,
             ...(payload?.isMultithread !== undefined ? { multiThreadSupported: payload.isMultithread } : {}),
+            ...(payload?.activeModelName ? { activeModelName: payload.activeModelName } : {}),
           }));
           break;
 
@@ -94,6 +95,7 @@ export function useCognitiveEngine() {
             loadedBytes: payload.loaded,
             totalBytes: payload.total,
             percentage: payload.percentage,
+            ...(payload.activeModelName ? { activeModelName: payload.activeModelName } : {}),
           }));
           break;
 
@@ -211,8 +213,8 @@ export function useCognitiveEngine() {
   }, []);
 
   const initEngine = useCallback(
-    (customUrl?: string, customBlob?: Blob) => {
-      if (hasInitialized.current && !modelProgress.error && !customUrl && !customBlob) {
+    (customUrl?: string, customBlob?: Blob, customModelPath?: string) => {
+      if (hasInitialized.current && !modelProgress.error && !customUrl && !customBlob && !customModelPath) {
         return;
       }
       hasInitialized.current = true;
@@ -225,17 +227,30 @@ export function useCognitiveEngine() {
         workerRef.current = null;
       }
 
+      const targetUrl = customUrl || HF_MODEL_URL;
+      const targetModelName =
+        customModelPath ||
+        (customBlob instanceof File ? customBlob.name : null) ||
+        (targetUrl ? targetUrl.split('/').pop()?.split('?')[0] : null) ||
+        DEFAULT_MODEL_NAME;
+
       setModelProgress((prev) => ({
         ...prev,
         status: 'downloading',
         percentage: 0,
         error: undefined,
+        activeModelName: targetModelName,
       }));
 
       const worker = spawnWorker();
       worker.postMessage({
         type: 'INIT',
-        payload: { modelUrl: customUrl || HF_MODEL_URL, customBlob },
+        payload: {
+          modelUrl: targetUrl,
+          customBlob,
+          modelPath: targetModelName,
+          modelName: targetModelName,
+        },
       } satisfies WllamaInboundMessage);
     },
     [modelProgress.error, spawnWorker]

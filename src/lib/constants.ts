@@ -9,6 +9,7 @@ export const FALLBACK_MODEL_URL =
   'https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf';
 
 export const DEFAULT_MODEL_NAME = 'yuli-0.1.0-e2b.Q4_K_M.gguf';
+export const DEFAULT_MODEL_PATH = DEFAULT_MODEL_NAME;
 
 // High-speed CDN mirror staging and local path fallback
 export const MODEL_OPTIONS = [
@@ -16,6 +17,7 @@ export const MODEL_OPTIONS = [
     id: 'yuli-huggingface',
     name: 'Yuli 0.1.0 E2B (Hugging Face Direct)',
     url: HF_MODEL_URL,
+    fileName: DEFAULT_MODEL_NAME,
     sizeLabel: '~1.5 GB',
     description: 'Official v0.1.0 Sovereign weights via Hugging Face resolve URL (native CORS & Range requests)',
   },
@@ -23,6 +25,7 @@ export const MODEL_OPTIONS = [
     id: 'yuli-netlify-proxy',
     name: 'Yuli 0.1.0 E2B (Netlify Edge Proxy)',
     url: '/models/yuli.gguf',
+    fileName: DEFAULT_MODEL_NAME,
     sizeLabel: '~1.5 GB',
     description: 'Official v0.1.0 Sovereign weights streamed via Netlify 200 rewrite (bypasses browser CORS)',
   },
@@ -30,6 +33,7 @@ export const MODEL_OPTIONS = [
     id: 'yuli-github-release',
     name: 'Yuli 0.1.0 E2B (GitHub Direct Release)',
     url: FALLBACK_MODEL_URL,
+    fileName: DEFAULT_MODEL_NAME,
     sizeLabel: '~1.5 GB',
     description: 'Direct GitHub Releases asset URL (requires CORS redirect bypass)',
   },
@@ -37,6 +41,7 @@ export const MODEL_OPTIONS = [
     id: 'hf-gemma-2b',
     name: 'Gemma-2-2b-it Q4_K_M (Hugging Face)',
     url: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf',
+    fileName: 'gemma-2-2b-it-Q4_K_M.gguf',
     sizeLabel: '1.63 GB',
     description: 'Google Gemma 2 2B Instruct quantized in Q4_K_M',
   },
@@ -44,6 +49,7 @@ export const MODEL_OPTIONS = [
     id: 'hf-smollm-360m',
     name: 'SmolLM-360M-Instruct Q4_K_M (Instant Edge)',
     url: 'https://huggingface.co/HuggingFaceTB/SmolLM-360M-Instruct-GGUF/resolve/main/smollm-360m-instruct-q4_k_m.gguf',
+    fileName: 'smollm-360m-instruct-q4_k_m.gguf',
     sizeLabel: '229 MB',
     description: 'Ultra-fast lightweight model for resource-constrained or mobile testing',
   },
@@ -51,6 +57,7 @@ export const MODEL_OPTIONS = [
     id: 'hf-qwen-0.5b',
     name: 'Qwen2.5-0.5B-Instruct Q4_K_M',
     url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
+    fileName: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
     sizeLabel: '390 MB',
     description: 'Compact multi-lingual edge model with crisp reasoning',
   },
