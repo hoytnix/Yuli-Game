@@ -8,8 +8,8 @@
 | **WASM Asset Distribution** | Completed | `vite-plugin-static-copy` configured for wllama & wa-sqlite WASM |
 | **Bitwise 4-Sides Math ($\mathbb{F}_2^4$)** | Completed | Deterministic XOR math, palette metadata, token parsing in `lib/bitwiseMath.ts` |
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
-| **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount, schema creation, seed facts, interactions & relational state CRUD |
-| **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction |
+| **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount, schema creation, seed facts, interactions & relational state CRUD. Guarded by initPromise and SQLITE_OPEN_CREATE flags. |
+| **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction. Guarded against premature isMultithread() calls. |
 | **GGUF Model Delivery (GitHub Releases CDN)** | Completed | Pointed `DEFAULT_MODEL_URL` to v0.1.0 release asset (`yuli-0.1.0-e2b.Q4_K_M.gguf`) with byte-range streaming support |
 | **React UI & Sensory Shell** | Completed | `AmbientBackdrop`, `CognitiveHUD`, `ChatViewport`, `MemoryVaultModal`, `ModelProgressModal`, `StorageHealth` |
 | **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback) |

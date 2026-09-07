@@ -11,6 +11,7 @@ import { SQLiteInboundMessage, PartnerFact, InteractionRecord } from '../types';
 let sqlite3: any = null;
 let db: number | null = null;
 let isOpfsStorage = false;
+let initPromise: Promise<void> | null = null;
 
 async function executeQuery<T = any>(sql: string): Promise<T[]> {
   if (!sqlite3 || db === null) throw new Error('Database not initialized');
@@ -31,7 +32,7 @@ async function executeRun(sql: string): Promise<void> {
 }
 
 async function initDatabase() {
-  if (db !== null) return;
+  if (db !== null && sqlite3 !== null) return;
 
   const origin = self.location.origin;
   const wasmUrl = `${origin}/sqlite/wa-sqlite-async.wasm`;
@@ -42,10 +43,12 @@ async function initDatabase() {
 
   sqlite3 = SQLite.Factory(module);
 
+  let vfsName: string | undefined = undefined;
   try {
     if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.getDirectory === 'function') {
       const vfs = new OriginPrivateFileSystemVFS();
       sqlite3.vfs_register(vfs, true);
+      vfsName = vfs.name;
       isOpfsStorage = true;
       console.log('[SQLite-Worker] Mounted wa-sqlite on Origin Private File System (OPFS).');
     } else {
@@ -55,11 +58,16 @@ async function initDatabase() {
     console.warn('[SQLite-Worker] Falling back to MemoryAsyncVFS:', err);
     const fallbackVfs = new MemoryAsyncVFS();
     sqlite3.vfs_register(fallbackVfs, true);
+    vfsName = fallbackVfs.name;
     isOpfsStorage = false;
   }
 
-  // Open the primary relational ledger
-  db = await sqlite3.open_v2('relational_ledger.db');
+  // Open the primary relational ledger with readwrite + create flags
+  db = await sqlite3.open_v2(
+    'relational_ledger.db',
+    SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE,
+    vfsName
+  );
 
   // Schema creation according to specification 3.D
   await executeRun(`
@@ -119,11 +127,29 @@ async function getStorageStats() {
   return { usage: 0, quota: 0 };
 }
 
-self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage>) => {
+self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage | any>) => {
   const data = event.data;
+  const { id, type, sql } = data || {};
 
   try {
-    await initDatabase();
+    if (!initPromise) {
+      initPromise = initDatabase();
+    }
+    await initPromise;
+
+    if (type === 'EXEC' || type === 'QUERY') {
+      const rows: any[] = [];
+      await sqlite3.exec(db!, sql, (row: any[], cols: string[]) => {
+        const obj: Record<string, any> = {};
+        cols.forEach((col, i) => {
+          obj[col] = row[i];
+        });
+        rows.push(obj);
+      });
+
+      self.postMessage({ id, type: 'SUCCESS', payload: rows });
+      return;
+    }
 
     switch (data.type) {
       case 'INIT_DB': {
@@ -291,6 +317,7 @@ self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage
   } catch (err: any) {
     console.error('[SQLite-Worker] SQL Execution Error:', err);
     self.postMessage({
+      id,
       type: 'ERROR',
       payload: { error: err?.message || 'Database error' },
     });

@@ -52,8 +52,24 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
       case 'CHECK_STATUS': {
         const engine = await initWllamaEngine();
         const isLoaded = engine.isModelLoaded();
-        const webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
-        const multiThread = typeof engine.isMultithread === 'function' ? engine.isMultithread() : true;
+        let webGpu = false;
+        let multiThread = false;
+
+        // In Wllama, isMultithread() throws if loadModel() has not yet completed
+        if (isLoaded) {
+          try {
+            webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
+          } catch {
+            webGpu = false;
+          }
+          try {
+            multiThread = typeof engine.isMultithread === 'function' ? engine.isMultithread() : false;
+          } catch {
+            multiThread = false;
+          }
+        } else {
+          multiThread = typeof navigator !== 'undefined' && 'hardwareConcurrency' in navigator && (navigator.hardwareConcurrency || 1) > 1;
+        }
 
         self.postMessage({
           type: 'STATUS_UPDATE',
@@ -117,13 +133,34 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
                     isCached: false,
                   },
                 });
+                self.postMessage({
+                  type: 'PROGRESS',
+                  payload: {
+                    loaded,
+                    total,
+                    percentage: pct,
+                  },
+                });
               },
             });
           }
 
           const isLoaded = engine.isModelLoaded();
-          const webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
-          const multiThread = typeof engine.isMultithread === 'function' ? engine.isMultithread() : true;
+
+          // Only inspect properties AFTER loadModelFromUrl completes
+          let webGpu = false;
+          try {
+            webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
+          } catch {
+            webGpu = false;
+          }
+
+          let hasMulti = false;
+          try {
+            hasMulti = typeof engine.isMultithread === 'function' ? engine.isMultithread() : false;
+          } catch {
+            hasMulti = false;
+          }
 
           self.postMessage({
             type: 'STATUS_UPDATE',
@@ -133,8 +170,13 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
               isCached: true,
               activeModelName: loadedModelIdentifier,
               webGpuSupported: webGpu,
-              multiThreadSupported: multiThread,
+              multiThreadSupported: hasMulti,
             },
+          });
+
+          self.postMessage({
+            type: 'READY',
+            payload: { isMultithread: hasMulti },
           });
         } catch (loadErr: any) {
           console.error('[Wllama-Worker] Failed to load model:', loadErr);

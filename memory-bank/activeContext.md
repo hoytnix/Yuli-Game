@@ -1,24 +1,20 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Active GGUF model CDN delivery configured and pointed to GitHub Releases v0.1.0 (`yuli-0.1.0-e2b.Q4_K_M.gguf`).
-- Verifying dynamic model loading, OPFS caching, and non-blocking worker streaming.
+- Resolved fatal worker initialization bugs: eliminated early Wllama `isMultithread()` call and enforced atomic OPFS schema creation.
+- Verifying clean worker startup in browser runtime and OPFS database access.
 
 ## Current Work Stream
-- Verified GitHub Releases CDN headers (`HTTP 200 OK`, `accept-ranges: bytes` through `release-assets.githubusercontent.com`).
-- Updated `DEFAULT_MODEL_URL` to `https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf`.
-- Updated `FALLBACK_MODEL_URL` to `/models/yuli-0.1.0-e2b.Q4_K_M.gguf`.
-- Extended `src/workers/wllama.worker.ts` to dynamically resolve `modelUrl` or default to `DEFAULT_MODEL_URL`, with explicit error messaging.
-- Verified TypeScript compilation (`pnpm exec tsc --noEmit`) passes cleanly with zero errors.
+- Fixed `src/workers/wllama.worker.ts`: Guarded `isMultithread()` inspection to only run after `loadModelFromUrl` resolves; safely infer multi-threading before model load in `CHECK_STATUS`.
+- Fixed `src/workers/sqlite.worker.ts`: Queued incoming messages behind singleton `initPromise` and passed `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE` to `sqlite3.open_v2` for `relational_ledger.db` to prevent `NotFoundError` and unhandled WASM abortion on OPFS.
+- Verified TypeScript compilation and production build bundling cleanly.
 
 ## Recent State Changes
-- Modified `src/lib/constants.ts` to export `DEFAULT_MODEL_URL` and `FALLBACK_MODEL_URL`, setting Yuli v0.1.0 as the primary model option.
-- Updated `src/workers/wllama.worker.ts` to support both `INIT` and `INIT_MODEL` with CDN fallback and diagnostic error emission.
-- Updated `src/hooks/useCognitiveEngine.ts` to default model loading requests to `DEFAULT_MODEL_URL`.
-- Stored repository file ownership to `oloty:oloty`.
+- Modified `src/workers/wllama.worker.ts` with capability checks guarded by `isModelLoaded()` and added `READY`/`PROGRESS` dispatches.
+- Modified `src/workers/sqlite.worker.ts` with `initPromise` gate, explicit `SQLITE_OPEN_CREATE` flags, and generic `EXEC`/`QUERY` support.
 
 ## Next Immediate Steps
-1. Launch local dev server (`pnpm dev --host 0.0.0.0 --port 5173`) to verify browser runtime initialization.
-2. Confirm byte streaming into OPFS storage cache.
-3. Advance to Milestone 3 (Offline Service Worker Caching).
+- Deploy fixes and verify clean worker boot in DevTools console without `NotFoundError` or `loadModel() is not yet called`.
+- Clear browser OPFS site data in Chrome DevTools if stale locks exist from previous crashes.
+- Verify GGUF download streaming into cache upon clicking Weights.
 
