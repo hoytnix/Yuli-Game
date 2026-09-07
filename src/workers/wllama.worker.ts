@@ -87,9 +87,9 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
       case 'INIT':
       case 'INIT_MODEL': {
         const payload = (data as any).payload || {};
-        const modelUrl = payload.modelUrl;
+        const modelUrl = payload?.modelUrl || '/models/yuli.gguf';
         const customBlob = payload.customBlob;
-        const targetUrl = modelUrl || DEFAULT_MODEL_URL;
+        const targetUrl = modelUrl;
         loadedModelIdentifier = customBlob ? 'Local Upload GGUF' : targetUrl.split('/').pop() || targetUrl;
 
         self.postMessage({

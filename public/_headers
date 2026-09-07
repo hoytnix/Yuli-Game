@@ -1,6 +1,11 @@
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+  Access-Control-Allow-Origin: *
+
+/models/*
+  Access-Control-Allow-Origin: *
+  Accept-Ranges: bytes
 
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate

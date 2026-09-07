@@ -29,12 +29,28 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
+    proxy: {
+      '/models/yuli.gguf': {
+        target: 'https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf',
+        changeOrigin: true,
+        followRedirects: true,
+        rewrite: () => '',
+      },
+    },
   },
   preview: {
     port: 4173,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+    proxy: {
+      '/models/yuli.gguf': {
+        target: 'https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf',
+        changeOrigin: true,
+        followRedirects: true,
+        rewrite: () => '',
+      },
     },
   },
   worker: {

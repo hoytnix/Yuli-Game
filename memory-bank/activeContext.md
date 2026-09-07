@@ -1,23 +1,23 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Resolved Netlify deployment 404s, missing PWA icons, and stale Service Worker chunk caching.
-- Enforced mandatory Cross-Origin Isolation (`COOP`/`COEP`) headers and SPA redirect routing for Netlify.
+- Configured Netlify 200 rewrite edge proxy for the GGUF model (`/models/yuli.gguf`) to bypass browser CORS redirect blocks on GitHub Release assets.
+- Configured byte-range slicing headers and cross-origin isolation for model streaming.
 
 ## Current Work Stream
-- Created `netlify.toml`, `public/_headers`, and `public/_redirects` to enforce `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` on Netlify, along with SPA rewrites (`/* /index.html 200`) and immutable asset caching.
-- Generated valid PWA icons (`public/icon-192.png`, `public/icon-512.png`, `public/icon.svg`, and `public/vite.svg`) to eliminate manifest 404s.
-- Upgraded `public/sw.js` to `yuli-neuro-v2` with a network-first strategy for navigation requests (`index.html`) to prevent stale HTML from pointing to superseded hashed JS chunks on new deployments.
-- Added `vite:preloadError` listener in `src/main.tsx` to automatically recover from stale chunk hash mismatches during deployment rollouts.
+- Added rewrite rule `/models/yuli.gguf` -> GitHub Release asset (`200!`) in `public/_redirects` and `netlify.toml`.
+- Configured `Access-Control-Allow-Origin: *` and `Accept-Ranges: bytes` for `/models/*` in `public/_headers` and `netlify.toml`.
+- Updated `src/lib/constants.ts` with `DEFAULT_MODEL_URL = '/models/yuli.gguf'` and fallback to direct GitHub Release asset URL.
+- Updated `src/workers/wllama.worker.ts` default model URL to `/models/yuli.gguf`.
+- Configured Vite dev and preview server proxies in `vite.config.ts` to seamlessly proxy `/models/yuli.gguf` during local testing.
 
 ## Recent State Changes
-- Generated `icon-192.png`, `icon-512.png`, `icon.svg`, `vite.svg` in `public/`.
-- Configured Netlify headers and redirects in `netlify.toml`, `public/_headers`, `public/_redirects`.
-- Updated `public/sw.js` to network-first navigation caching and bumped cache to v2.
-- Updated `index.html` icon links.
-- Verified clean build and asset staging in `dist/`.
+- Configured Netlify 200 edge rewrite in `public/_redirects` and `netlify.toml`.
+- Updated streaming headers in `public/_headers` and `netlify.toml`.
+- Updated `src/lib/constants.ts` and `src/workers/wllama.worker.ts`.
+- Verified clean build and bundle output.
 
 ## Next Immediate Steps
-- Push changes to Netlify; test in browser to verify clean PWA icon loading and asset resolution.
+- Push changes to Netlify; test in browser to verify model streaming via `/models/yuli.gguf` without CORS errors.
 - Verify `crossOriginIsolated` is `true` in Netlify console.
 - Test Wllama GGUF loading and OPFS database initialization on the live Netlify deployment.

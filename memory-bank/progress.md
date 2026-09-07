@@ -13,7 +13,7 @@
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
 | **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount, schema creation, seed facts, interactions & relational state CRUD. Guarded by initPromise and SQLITE_OPEN_CREATE flags. |
 | **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction. Guarded against premature isMultithread() calls. |
-| **GGUF Model Delivery (GitHub Releases CDN)** | Completed | Pointed `DEFAULT_MODEL_URL` to v0.1.0 release asset (`yuli-0.1.0-e2b.Q4_K_M.gguf`) with byte-range streaming support |
+| **GGUF Model Delivery (Netlify Edge Proxy)** | Completed | Pointed `DEFAULT_MODEL_URL` to `/models/yuli.gguf` proxied via Netlify 200 rewrite rule from GitHub Releases v0.1.0 asset, with byte-range slicing |
 | **React UI & Sensory Shell** | Completed | `AmbientBackdrop`, `CognitiveHUD`, `ChatViewport`, `MemoryVaultModal`, `ModelProgressModal`, `StorageHealth` |
 | **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback) |
 | **Memory Bank Documentation** | Completed | 6 core files initialized and aligned with system realities |
@@ -21,7 +21,7 @@
 
 ## What Works
 - **Zero-Cloud Edge Inference**: Client-side execution via `@wllama/wllama` in dedicated worker.
-- **GitHub Release Model Streaming**: Direct multi-chunk streaming and OPFS caching from GitHub Releases CDN (`yuli-0.1.0-e2b.Q4_K_M.gguf`).
+- **Netlify 200 Edge Rewrite Proxy**: Bypasses GitHub Release S3 302 CORS redirection by streaming `/models/yuli.gguf` on the server edge directly to browser Wllama worker cache with `Accept-Ranges: bytes`.
 - **Relational Ledger Persistence**: `wa-sqlite` over OPFS storing user interactions, intimacy score, and partner facts.
 - **Dynamic 4-Sides Transformation**: Bitwise XOR transformations (`0EE` Ego, `1E6` Shadow, `2E7` Subconscious, `3E1` Superego) with synchronous ambient glow shifts.
 - **Collapsible Thought Streams**: Reasoning traces parsed out and displayed cleanly without bleeding into response text.
