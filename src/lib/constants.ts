@@ -1,13 +1,25 @@
 import { StateVector } from '../types';
 
-export const DEFAULT_MODEL_NAME = 'gemma-4-e2b.Q4_K_M.gguf';
+export const DEFAULT_MODEL_URL =
+  'https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf';
+
+export const FALLBACK_MODEL_URL = '/models/yuli-0.1.0-e2b.Q4_K_M.gguf';
+
+export const DEFAULT_MODEL_NAME = 'yuli-0.1.0-e2b.Q4_K_M.gguf';
 
 // High-speed CDN mirror staging and local path fallback
 export const MODEL_OPTIONS = [
   {
-    id: 'local-gemma',
-    name: 'Gemma 4 E2B (Local /models/)',
-    url: '/models/gemma-4-e2b.Q4_K_M.gguf',
+    id: 'yuli-github-release',
+    name: 'Yuli 0.1.0 E2B (GitHub Release CDN)',
+    url: DEFAULT_MODEL_URL,
+    sizeLabel: '~1.5 GB',
+    description: 'Official v0.1.0 Sovereign Companion weights hosted on GitHub Releases',
+  },
+  {
+    id: 'local-yuli',
+    name: 'Yuli 0.1.0 E2B (Local /models/)',
+    url: FALLBACK_MODEL_URL,
     sizeLabel: '~1.5 GB',
     description: 'Local filesystem model staged in public/models/',
   },

@@ -8,7 +8,7 @@ import {
   extractStateVector,
   calculateIntimacyDelta,
 } from '../lib/bitwiseMath';
-import { DEFAULT_MODEL_NAME } from '../lib/constants';
+import { DEFAULT_MODEL_NAME, DEFAULT_MODEL_URL } from '../lib/constants';
 
 let wllamaInstance: Wllama | null = null;
 let currentAbortController: AbortController | null = null;
@@ -68,9 +68,12 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
         break;
       }
 
+      case 'INIT':
       case 'INIT_MODEL': {
-        const { modelUrl, customBlob } = data.payload;
-        const targetUrl = modelUrl || `/models/${DEFAULT_MODEL_NAME}`;
+        const payload = (data as any).payload || {};
+        const modelUrl = payload.modelUrl;
+        const customBlob = payload.customBlob;
+        const targetUrl = modelUrl || DEFAULT_MODEL_URL;
         loadedModelIdentifier = customBlob ? 'Local Upload GGUF' : targetUrl.split('/').pop() || targetUrl;
 
         self.postMessage({
@@ -83,55 +86,63 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
           },
         });
 
-        const engine = await initWllamaEngine();
+        try {
+          const engine = await initWllamaEngine();
 
-        if (customBlob) {
+          if (customBlob) {
+            self.postMessage({
+              type: 'STATUS_UPDATE',
+              payload: { status: 'compiling_wasm', percentage: 70 },
+            });
+
+            await engine.loadModel([customBlob], {
+              n_ctx: 2048,
+              n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
+            });
+          } else {
+            // Check if model already in cache or stream from URL
+            await engine.loadModelFromUrl(targetUrl, {
+              useCache: true,
+              n_ctx: 2048,
+              n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
+              progressCallback: ({ loaded, total }) => {
+                const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+                self.postMessage({
+                  type: 'STATUS_UPDATE',
+                  payload: {
+                    status: 'downloading',
+                    loadedBytes: loaded,
+                    totalBytes: total,
+                    percentage: pct,
+                    isCached: false,
+                  },
+                });
+              },
+            });
+          }
+
+          const isLoaded = engine.isModelLoaded();
+          const webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
+          const multiThread = typeof engine.isMultithread === 'function' ? engine.isMultithread() : true;
+
           self.postMessage({
             type: 'STATUS_UPDATE',
-            payload: { status: 'compiling_wasm', percentage: 70 },
-          });
-
-          await engine.loadModel([customBlob], {
-            n_ctx: 2048,
-            n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
-          });
-        } else {
-          // Check if model already in cache or stream from URL
-          await engine.loadModelFromUrl(targetUrl, {
-            useCache: true,
-            n_ctx: 2048,
-            n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
-            progressCallback: ({ loaded, total }) => {
-              const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
-              self.postMessage({
-                type: 'STATUS_UPDATE',
-                payload: {
-                  status: 'downloading',
-                  loadedBytes: loaded,
-                  totalBytes: total,
-                  percentage: pct,
-                  isCached: false,
-                },
-              });
+            payload: {
+              status: isLoaded ? 'ready' : 'error',
+              percentage: 100,
+              isCached: true,
+              activeModelName: loadedModelIdentifier,
+              webGpuSupported: webGpu,
+              multiThreadSupported: multiThread,
             },
           });
+        } catch (loadErr: any) {
+          console.error('[Wllama-Worker] Failed to load model:', loadErr);
+          self.postMessage({
+            type: 'ERROR',
+            payload: { message: loadErr?.message || 'Failed to load model from GitHub CDN' },
+          });
         }
-
-        const isLoaded = engine.isModelLoaded();
-        const webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
-        const multiThread = typeof engine.isMultithread === 'function' ? engine.isMultithread() : true;
-
-        self.postMessage({
-          type: 'STATUS_UPDATE',
-          payload: {
-            status: isLoaded ? 'ready' : 'error',
-            percentage: 100,
-            isCached: true,
-            activeModelName: loadedModelIdentifier,
-            webGpuSupported: webGpu,
-            multiThreadSupported: multiThread,
-          },
-        });
         break;
       }
 

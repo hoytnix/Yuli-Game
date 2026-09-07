@@ -15,6 +15,7 @@ import {
   YULI_SYSTEM_PROMPT,
   INITIAL_GREETING,
   DEFAULT_MODEL_NAME,
+  DEFAULT_MODEL_URL,
 } from '../lib/constants';
 import { getCircadianMetrics } from '../lib/circadian';
 
@@ -154,7 +155,7 @@ export function useCognitiveEngine() {
     setModelProgress((prev) => ({ ...prev, status: 'downloading', percentage: 0, error: undefined }));
     workerRef.current.postMessage({
       type: 'INIT_MODEL',
-      payload: { modelUrl, customBlob },
+      payload: { modelUrl: modelUrl || DEFAULT_MODEL_URL, customBlob },
     } satisfies WllamaInboundMessage);
   }, []);
 

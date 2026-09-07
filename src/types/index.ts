@@ -89,6 +89,7 @@ export interface CircadianMetrics {
 // Web Worker IPC Message types
 export type WllamaInboundMessage =
   | { type: 'INIT_MODEL'; payload: { modelUrl?: string; customBlob?: Blob } }
+  | { type: 'INIT'; payload?: { modelUrl?: string } }
   | { type: 'GENERATE'; payload: { id: string; prompt: string; intimacyScore?: number; partnerFacts?: string[] } }
   | { type: 'ABORT' }
   | { type: 'CHECK_STATUS' };
