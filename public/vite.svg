@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <radialGradient id="yuli-bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#141828"/>
+      <stop offset="100%" stop-color="#07080d"/>
+    </radialGradient>
+    <radialGradient id="yuli-amber-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.8"/>
+      <stop offset="70%" stop-color="#D97706" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="33%" stop-color="#D946EF"/>
+      <stop offset="66%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <!-- Squircle Base -->
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#yuli-bg)" stroke="#1e293b" stroke-width="4"/>
+  
+  <!-- Ambient Core Glow -->
+  <circle cx="256" cy="256" r="160" fill="url(#yuli-amber-glow)" />
+
+  <!-- 4-Sides Hypercube Connector Lines -->
+  <path d="M256 120 L392 256 L256 392 L120 256 Z" stroke="url(#ring-grad)" stroke-width="3" stroke-dasharray="6 4" opacity="0.6"/>
+  <circle cx="256" cy="256" r="136" stroke="url(#ring-grad)" stroke-width="2" opacity="0.4"/>
+
+  <!-- Central Diamond Core -->
+  <polygon points="256,192 320,256 256,320 192,256" fill="#FEF08A" opacity="0.95" filter="drop-shadow(0 0 12px #F59E0B)"/>
+
+  <!-- 4 Node Vertices (0EE Ego, 1E6 Shadow, 2E7 Subconscious, 3E1 Superego) -->
+  <circle cx="256" cy="120" r="16" fill="#F59E0B" filter="drop-shadow(0 0 8px #F59E0B)"/>
+  <circle cx="392" cy="256" r="16" fill="#D946EF" filter="drop-shadow(0 0 8px #D946EF)"/>
+  <circle cx="256" cy="392" r="16" fill="#8B5CF6" filter="drop-shadow(0 0 8px #8B5CF6)"/>
+  <circle cx="120" cy="256" r="16" fill="#06B6D4" filter="drop-shadow(0 0 8px #06B6D4)"/>
+</svg>

@@ -24,7 +24,17 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         console.warn('[PWA] ServiceWorker registration failed:', err);
       });
   });
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('[PWA] Controller changed: new version active');
+  });
 }
+
+// Automatically recover from stale chunk hashes on redeploys
+window.addEventListener('vite:preloadError', () => {
+  console.warn('[PWA] Stale chunk detected after redeployment, reloading page...');
+  window.location.reload();
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -5,6 +5,9 @@
 | Component | Status | Notes |
 | :--- | :--- | :--- |
 | **PWA Scaffold & Vite Config** | Completed | React 19, Tailwind, COOP/COEP headers configured |
+| **Netlify Deployment Suite** | Completed | `netlify.toml`, `public/_headers`, `public/_redirects` configured for COOP/COEP, SPA routing, cache control |
+| **PWA Icons & Manifest** | Completed | `icon-192.png`, `icon-512.png`, `icon.svg`, and `vite.svg` generated and mapped |
+| **Service Worker & Chunk Healing** | Completed | Network-first navigation in `sw.js` (v2), cache purge on activate, `vite:preloadError` auto-recovery |
 | **WASM Asset Distribution** | Completed | `vite-plugin-static-copy` configured for wllama & wa-sqlite WASM |
 | **Bitwise 4-Sides Math ($\mathbb{F}_2^4$)** | Completed | Deterministic XOR math, palette metadata, token parsing in `lib/bitwiseMath.ts` |
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
@@ -23,13 +26,15 @@
 - **Dynamic 4-Sides Transformation**: Bitwise XOR transformations (`0EE` Ego, `1E6` Shadow, `2E7` Subconscious, `3E1` Superego) with synchronous ambient glow shifts.
 - **Collapsible Thought Streams**: Reasoning traces parsed out and displayed cleanly without bleeding into response text.
 - **Interactive Memory Vault**: Live CRUD interface for user memory inspection and relational state adjustments.
-- **Cross-Origin Isolation**: Verified in `vite.config.ts`.
+- **Cross-Origin Isolation**: Verified in `vite.config.ts`, `netlify.toml`, and `public/_headers`.
+- **Netlify SPA Routing & PWA Asset Serving**: Fixed 404s for icons and stale hashed JS chunk requests.
 
 ## Invariants to Guard
-- Invariant 7 (`navigator.storage.persist()` in `main.tsx`): StorageHealth component provides user-triggered persistence request, but automatic invocation in `main.tsx` on initialization ensures defense against silent eviction.
+- Invariant 5 (Cross-Origin Isolation): Netlify `_headers` and `netlify.toml` ensure production isolation headers (`COOP: same-origin`, `COEP: require-corp`) for WebGPU and multi-threaded WASM.
+- Invariant 7 (`navigator.storage.persist()` in `main.tsx`): Automatic invocation in `main.tsx` on initialization ensures defense against silent eviction.
 
 ## Roadmap & Next Milestones
 - **Milestone 1: Core Foundation & Memory Bank** (Complete)
 - **Milestone 2: GGUF Model Hosting & CDN Integration** (Complete: Hosted on GitHub Releases v0.1.0)
-- **Milestone 3: Offline Service Worker Caching** (PWA offline caching for app shell and model artifacts)
+- **Milestone 3: Offline Service Worker Caching** (Complete: Network-first shell, asset cache v2)
 - **Milestone 4: Voice & Audio Edge Extensions** (Browser Web Speech API / local Whisper WASM)

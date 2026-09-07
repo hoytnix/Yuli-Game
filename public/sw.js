@@ -1,9 +1,12 @@
 // Project Yuli PWA Service Worker
-const CACHE_NAME = 'yuli-neuro-v1';
+const CACHE_NAME = 'yuli-neuro-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/icon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
   '/wllama/wllama.wasm',
   '/sqlite/wa-sqlite-async.wasm'
 ];
@@ -39,13 +42,41 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Navigation requests: Network-first to prevent stale HTML referencing old hashed JS chunks
+  const isNavigation = event.request.mode === 'navigate' ||
+                       event.request.destination === 'document' ||
+                       url.pathname === '/' ||
+                       url.pathname.endsWith('.html');
+
+  if (isNavigation && url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => {
+            return cached || caches.match('/index.html');
+          });
+        })
+    );
+    return;
+  }
+
+  // Other assets: Cache-first, fallback to network
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).then((response) => {
-        // Cache successful local GET requests
+        // Cache successful local GET requests (skip vite internal dev endpoints)
         if (
           event.request.method === 'GET' &&
           response.status === 200 &&
