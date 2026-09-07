@@ -12,15 +12,16 @@
 | **Bitwise 4-Sides Math ($\mathbb{F}_2^4$)** | Completed | Deterministic XOR math, palette metadata, token parsing in `lib/bitwiseMath.ts` |
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
 | **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount via `SafeOriginPrivateFileSystemVFS` (intercepts NotFoundError), serialized FIFO mutex queue, in-memory journal mode to prevent Asyncify stack corruption and lock collisions |
-| **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction, cache integrity size checks and automated corrupt file purging. |
+| **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction, cache integrity checks, corrupt file purging, and duplicate INIT collision guards (`isLoading`/`isLoaded`). |
 | **GGUF Model Delivery (Netlify Edge Function)** | Completed | `/models/yuli.gguf` served by Netlify Edge Function (`model-proxy.ts`) returning HTTP 307 redirect with CORS to signed Azure storage, avoiding 30s Netlify edge runtime timeout |
 | **React UI & Sensory Shell** | Completed | `AmbientBackdrop`, `CognitiveHUD`, `ChatViewport`, `MemoryVaultModal`, `ModelProgressModal`, `StorageHealth` |
-| **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback), worker auto-recreation on error to forcibly release OPFS locks |
+| **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback), single boot ref guard (`hasInitialized`) preventing StrictMode double-initialization, worker recreation on error |
 | **Memory Bank Documentation** | Completed | 6 core files initialized and aligned with system realities |
 | **Repository Hygiene (.gitignore)** | Completed | Cleanly ignores node_modules, dist, .vite, GGUF weights, SQLite test files, alternate lockfiles |
 
 ## What Works
 - **Zero-Cloud Edge Inference**: Client-side execution via `@wllama/wllama` in dedicated worker.
+- **Concurrency & Double-Boot Defense**: Multi-level defense against React StrictMode concurrent initialization collisions in both worker state and hook lifecycle.
 - **Netlify Edge Function Model Redirect**: Returns HTTP 307 redirect with CORS to direct Azure Blob storage, allowing full weight download without edge function timeout.
 - **Auto-Releasing OPFS Locks**: `useCognitiveEngine` terminates previous worker on error recovery so browser releases all open OPFS file handles without `NoModificationAllowedError`.
 - **Serialized OPFS SQLite Persistence**: `wa-sqlite` over OPFS with FIFO mutex queue to prevent Asyncify concurrency faults, with `SafeOriginPrivateFileSystemVFS` guarding against `NotFoundError`.

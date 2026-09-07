@@ -11,6 +11,8 @@ import {
 import { DEFAULT_MODEL_NAME, DEFAULT_MODEL_URL } from '../lib/constants';
 
 let wllamaInstance: Wllama | null = null;
+let isLoading = false;
+let isLoaded = false;
 let currentAbortController: AbortController | null = null;
 let isBusy = false;
 let loadedModelIdentifier = '';
@@ -38,7 +40,7 @@ async function initWllamaEngine(): Promise<Wllama> {
       error: (...args) => console.error('[Wllama-Worker]', ...args),
     },
     parallelDownloads: 3,
-    allowOffline: false,
+    allowOffline: true,
   });
 
   return wllamaInstance;
@@ -50,35 +52,59 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
   try {
     switch (data.type) {
       case 'CHECK_STATUS': {
-        const engine = await initWllamaEngine();
-        const isLoaded = engine.isModelLoaded();
-        let webGpu = false;
-        let multiThread = false;
-
-        // In Wllama, isMultithread() throws if loadModel() has not yet completed
-        if (isLoaded) {
+        if (isLoaded && wllamaInstance) {
+          let webGpu = false;
           try {
-            webGpu = typeof engine.isSupportWebGPU === 'function' ? engine.isSupportWebGPU() : false;
+            webGpu = typeof wllamaInstance.isSupportWebGPU === 'function' ? wllamaInstance.isSupportWebGPU() : false;
           } catch {
             webGpu = false;
           }
+          let hasMulti = false;
           try {
-            multiThread = typeof engine.isMultithread === 'function' ? engine.isMultithread() : false;
+            hasMulti = typeof wllamaInstance.isMultithread === 'function' ? wllamaInstance.isMultithread() : false;
           } catch {
-            multiThread = false;
+            hasMulti = false;
           }
-        } else {
-          multiThread = typeof navigator !== 'undefined' && 'hardwareConcurrency' in navigator && (navigator.hardwareConcurrency || 1) > 1;
+
+          self.postMessage({
+            type: 'STATUS_UPDATE',
+            payload: {
+              status: 'ready',
+              webGpuSupported: webGpu,
+              multiThreadSupported: hasMulti,
+              activeModelName: loadedModelIdentifier,
+              percentage: 100,
+              isCached: true,
+            },
+          });
+          self.postMessage({ type: 'READY', payload: { isMultithread: hasMulti } });
+          break;
         }
+
+        if (isLoading) {
+          self.postMessage({
+            type: 'STATUS_UPDATE',
+            payload: {
+              status: 'downloading',
+              activeModelName: loadedModelIdentifier,
+            },
+          });
+          break;
+        }
+
+        const multiThread =
+          typeof navigator !== 'undefined' &&
+          'hardwareConcurrency' in navigator &&
+          (navigator.hardwareConcurrency || 1) > 1;
 
         self.postMessage({
           type: 'STATUS_UPDATE',
           payload: {
-            status: isLoaded ? 'ready' : 'idle',
-            webGpuSupported: webGpu,
+            status: 'idle',
+            webGpuSupported: false,
             multiThreadSupported: multiThread,
-            activeModelName: isLoaded ? loadedModelIdentifier : '',
-            percentage: isLoaded ? 100 : 0,
+            activeModelName: '',
+            percentage: 0,
           },
         });
         break;
@@ -87,10 +113,32 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
       case 'INIT':
       case 'INIT_MODEL': {
         const payload = (data as any).payload || {};
-        const modelUrl = payload?.modelUrl || '/models/yuli.gguf';
+        const modelUrl = payload?.modelUrl || DEFAULT_MODEL_URL;
         const customBlob = payload.customBlob;
         const targetUrl = modelUrl;
         loadedModelIdentifier = customBlob ? 'Local Upload GGUF' : targetUrl.split('/').pop() || targetUrl;
+
+        // Guard against duplicate invocations
+        if (isLoaded) {
+          self.postMessage({
+            type: 'STATUS_UPDATE',
+            payload: {
+              status: 'ready',
+              percentage: 100,
+              isCached: true,
+              activeModelName: loadedModelIdentifier,
+            },
+          });
+          self.postMessage({ type: 'READY' });
+          return;
+        }
+
+        if (isLoading) {
+          console.warn('[Wllama-Worker] Model initialization already in progress, skipping duplicate request.');
+          return;
+        }
+
+        isLoading = true;
 
         self.postMessage({
           type: 'STATUS_UPDATE',
@@ -160,7 +208,8 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
             });
           }
 
-          const isLoaded = engine.isModelLoaded();
+          isLoaded = engine.isModelLoaded();
+          isLoading = false;
 
           // Only inspect properties AFTER loadModelFromUrl completes
           let webGpu = false;
@@ -176,6 +225,8 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
           } catch {
             hasMulti = false;
           }
+
+          console.log('[Wllama-Worker] Model successfully loaded and ready.');
 
           self.postMessage({
             type: 'STATUS_UPDATE',
@@ -194,6 +245,9 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
             payload: { isMultithread: hasMulti },
           });
         } catch (loadErr: any) {
+          isLoading = false;
+          isLoaded = false;
+          wllamaInstance = null;
           console.error('[Wllama-Worker] Failed to load model:', loadErr);
           try {
             const engine = await initWllamaEngine();
@@ -308,6 +362,27 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
         } finally {
           isBusy = false;
           currentAbortController = null;
+        }
+        break;
+      }
+
+      case 'COMPLETION': {
+        if (!wllamaInstance || !isLoaded) {
+          self.postMessage({
+            type: 'ERROR',
+            payload: { message: 'Model is not loaded yet.' },
+          });
+          break;
+        }
+        try {
+          const { prompt, options } = (data as any).payload || {};
+          const response = await (wllamaInstance as any).createCompletion(prompt, options || {});
+          self.postMessage({ type: 'SUCCESS', payload: response });
+        } catch (err: any) {
+          self.postMessage({
+            type: 'ERROR',
+            payload: { message: err?.message || String(err) },
+          });
         }
         break;
       }

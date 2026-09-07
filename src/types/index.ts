@@ -89,8 +89,9 @@ export interface CircadianMetrics {
 // Web Worker IPC Message types
 export type WllamaInboundMessage =
   | { type: 'INIT_MODEL'; payload: { modelUrl?: string; customBlob?: Blob } }
-  | { type: 'INIT'; payload?: { modelUrl?: string } }
+  | { type: 'INIT'; payload?: { modelUrl?: string; customBlob?: Blob } }
   | { type: 'GENERATE'; payload: { id: string; prompt: string; intimacyScore?: number; partnerFacts?: string[] } }
+  | { type: 'COMPLETION'; payload?: { prompt: string; options?: any } }
   | { type: 'ABORT' }
   | { type: 'CHECK_STATUS' };
 
@@ -112,7 +113,8 @@ export type WllamaOutboundMessage =
         intimacyDelta: number;
       };
     }
-  | { type: 'ERROR'; payload: { message: string } };
+  | { type: 'SUCCESS'; payload?: any }
+  | { type: 'ERROR'; payload: { message: string } | string };
 
 export type SQLiteInboundMessage =
   | { type: 'INIT_DB' }

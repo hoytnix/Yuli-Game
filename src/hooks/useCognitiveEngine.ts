@@ -54,11 +54,14 @@ export function useCognitiveEngine() {
   });
 
   const workerRef = useRef<Worker | null>(null);
+  const hasInitialized = useRef(false);
   const activeMessageIdRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(0);
   const tokenCountRef = useRef<number>(0);
 
-  const createWorker = useCallback(() => {
+  const spawnWorker = useCallback(() => {
+    if (workerRef.current) return workerRef.current;
+
     const worker = new Worker(new URL('../workers/wllama.worker.ts', import.meta.url), {
       type: 'module',
     });
@@ -154,45 +157,34 @@ export function useCognitiveEngine() {
           break;
         }
 
-        case 'ERROR':
-          console.warn('[useCognitiveEngine] Worker error notice:', payload.message);
+        case 'ERROR': {
+          const errMsg = (payload as any)?.message || String(payload);
+          console.warn('[useCognitiveEngine] Worker error notice:', errMsg);
           setIsGenerating(false);
           setIsThinking(false);
-          setModelProgress((prev) => ({ ...prev, status: 'error', error: payload.message }));
+          setModelProgress((prev) => ({ ...prev, status: 'error', error: errMsg }));
           break;
+        }
       }
     };
 
+    workerRef.current = worker;
     return worker;
   }, []);
 
-  // Initialize Worker
-  useEffect(() => {
-    const worker = createWorker();
-    workerRef.current = worker;
-
-    // Check capability and status
-    worker.postMessage({ type: 'CHECK_STATUS' } satisfies WllamaInboundMessage);
-
-    return () => {
-      worker.terminate();
-      workerRef.current = null;
-    };
-  }, [createWorker]);
-
   const initEngine = useCallback(
-    async (customUrl?: string, customBlob?: Blob) => {
-      if (modelProgress.status === 'downloading' || modelProgress.status === 'compiling_wasm') {
+    (customUrl?: string, customBlob?: Blob) => {
+      if (hasInitialized.current && !modelProgress.error && !customUrl && !customBlob) {
         return;
       }
+      hasInitialized.current = true;
 
-      // If recovering from an error, terminate the old worker to release any OPFS file locks
+      // If recovering from an error, tear down the dead worker first
       if (modelProgress.error && workerRef.current) {
-        workerRef.current.terminate();
-        const freshWorker = createWorker();
-        workerRef.current = freshWorker;
-      } else if (!workerRef.current) {
-        workerRef.current = createWorker();
+        try {
+          workerRef.current.terminate();
+        } catch {}
+        workerRef.current = null;
       }
 
       setModelProgress((prev) => ({
@@ -202,13 +194,24 @@ export function useCognitiveEngine() {
         error: undefined,
       }));
 
-      workerRef.current?.postMessage({
-        type: 'INIT_MODEL',
+      const worker = spawnWorker();
+      worker.postMessage({
+        type: 'INIT',
         payload: { modelUrl: customUrl || DEFAULT_MODEL_URL, customBlob },
       } satisfies WllamaInboundMessage);
     },
-    [modelProgress.status, modelProgress.error, createWorker]
+    [modelProgress.error, spawnWorker]
   );
+
+  useEffect(() => {
+    // Single boot on component mount
+    if (!hasInitialized.current) {
+      initEngine();
+    } else {
+      const worker = spawnWorker();
+      worker.postMessage({ type: 'CHECK_STATUS' } satisfies WllamaInboundMessage);
+    }
+  }, [initEngine, spawnWorker]);
 
   const loadModel = initEngine;
 
@@ -372,7 +375,23 @@ Yuli:`;
     setActiveVector(vector);
   }, []);
 
+  const isReady = modelProgress.status === 'ready';
+  const isInitializing =
+    modelProgress.status === 'downloading' ||
+    modelProgress.status === 'compiling_wasm' ||
+    modelProgress.status === 'checking_cache';
+  const progress = {
+    loaded: modelProgress.loadedBytes,
+    total: modelProgress.totalBytes,
+    percentage: modelProgress.percentage,
+  };
+  const error = modelProgress.error || null;
+
   return {
+    isReady,
+    isInitializing,
+    progress,
+    error,
     messages,
     activeVector,
     isGenerating,
