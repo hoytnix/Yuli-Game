@@ -39,7 +39,7 @@ async function initWllamaEngine(): Promise<Wllama> {
       warn: (...args) => console.warn('[Wllama-Worker]', ...args),
       error: (...args) => console.error('[Wllama-Worker]', ...args),
     },
-    parallelDownloads: 3,
+    parallelDownloads: 1,
     allowOffline: true,
   });
 

@@ -1,22 +1,21 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Resolved React 18/19 StrictMode double-initialization collision (`Module is already initialized` in Wllama WASM runtime) by implementing single-boot worker management and duplicate invocation guards.
-- Hardened `src/workers/wllama.worker.ts` with stateful lifecycle guards (`isLoading` / `isLoaded`) to ignore duplicate `INIT` calls, gracefully reset state on failure, and support `COMPLETION` commands.
-- Updated `src/hooks/useCognitiveEngine.ts` with `spawnWorker` and `hasInitialized` ref to ensure single initialization across component renders and remounts.
+- Resolved Azure Blob cross-origin blockage caused by HTTP 307 client redirects by implementing a true HTTP 206 Partial Content Range streamer in Netlify Edge Function (`netlify/edge-functions/model-proxy.ts`).
+- Forwarded client `Range: bytes=start-end` headers upstream to Azure, streaming small byte chunks with explicit CORS headers (`Access-Control-Allow-Origin: *`, `Accept-Ranges: bytes`, `Access-Control-Expose-Headers`).
+- Set `parallelDownloads: 1` in `src/workers/wllama.worker.ts` to ensure sequential chunk retrieval, avoiding edge concurrency limits.
 
 ## Current Work Stream
-- Added lifecycle tracking (`isLoading`, `isLoaded`) in `src/workers/wllama.worker.ts` to reject duplicate concurrent loads.
-- Updated `useCognitiveEngine.ts` to boot worker once on mount, keep worker alive across React StrictMode remounts, and cleanly recreate dead workers on error recovery.
-- Added `COMPLETION` and `SUCCESS` types to `src/types/index.ts`.
+- Converted `model-proxy.ts` from HTTP 307 redirect back to server-side 206 chunk streamer with full byte-range header forwarding.
+- Configured Wllama with sequential downloads (`parallelDownloads: 1`) and active cache integrity checks.
 
 ## Recent State Changes
+- Modified `netlify/edge-functions/model-proxy.ts`.
 - Modified `src/workers/wllama.worker.ts`.
-- Modified `src/hooks/useCognitiveEngine.ts`.
-- Modified `src/types/index.ts`.
 - Confirmed zero errors with `pnpm exec tsc --noEmit`.
 
 ## Next Immediate Steps
 - Wipe existing corrupted model fragments and lockfiles from browser OPFS via DevTools console.
-- Refresh `project-yuli.netlify.app` and verify uninterrupted model loading to `READY`.
+- Commit and push to origin main to trigger Netlify deployment.
+- Verify sub-second 206 Partial Content responses and successful model mounting.
 
