@@ -1,17 +1,61 @@
 // @ts-ignore
-import SQLiteAsyncESMFactory from 'wa-sqlite/dist/wa-sqlite-async.mjs';
+import SQLiteESMFactory from 'wa-sqlite/dist/wa-sqlite-async.mjs';
 // @ts-ignore
 import * as SQLite from 'wa-sqlite';
 // @ts-ignore
 import { OriginPrivateFileSystemVFS } from 'wa-sqlite/src/examples/OriginPrivateFileSystemVFS.js';
 // @ts-ignore
 import { MemoryAsyncVFS } from 'wa-sqlite/src/examples/MemoryAsyncVFS.js';
-import { SQLiteInboundMessage, PartnerFact, InteractionRecord } from '../types';
+import { PartnerFact, InteractionRecord } from '../types';
+
+class SafeOriginPrivateFileSystemVFS extends OriginPrivateFileSystemVFS {
+  name: string;
+
+  constructor(name: string = 'yuli-vfs') {
+    super();
+    this.name = name;
+  }
+
+  static async create(name: string = 'yuli-vfs', wasmModule?: any) {
+    return new SafeOriginPrivateFileSystemVFS(name);
+  }
+
+  async xDelete(name: string, syncDir: number) {
+    try {
+      return await super.xDelete(name, syncDir);
+    } catch (err: any) {
+      if (err?.name === 'NotFoundError' || err?.message?.includes('NotFoundError')) {
+        return SQLite.SQLITE_OK;
+      }
+      throw err;
+    }
+  }
+
+  async xAccess(name: string, flags: number, pResOut: number) {
+    try {
+      return await super.xAccess(name, flags, pResOut);
+    } catch (err: any) {
+      if (err?.name === 'NotFoundError' || err?.message?.includes('NotFoundError')) {
+        return SQLite.SQLITE_OK;
+      }
+      throw err;
+    }
+  }
+}
 
 let sqlite3: any = null;
 let db: number | null = null;
+let isInitialized = false;
 let isOpfsStorage = false;
-let initPromise: Promise<void> | null = null;
+
+// Sequential FIFO queue to prevent concurrent Asyncify stack corruption
+let queue: Promise<any> = Promise.resolve();
+
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const next = queue.then(task, task);
+  queue = next.catch(() => {});
+  return next;
+}
 
 async function executeQuery<T = any>(sql: string): Promise<T[]> {
   if (!sqlite3 || db === null) throw new Error('Database not initialized');
@@ -31,91 +75,6 @@ async function executeRun(sql: string): Promise<void> {
   await sqlite3.exec(db, sql);
 }
 
-async function initDatabase() {
-  if (db !== null && sqlite3 !== null) return;
-
-  const origin = self.location.origin;
-  const wasmUrl = `${origin}/sqlite/wa-sqlite-async.wasm`;
-
-  const module = await SQLiteAsyncESMFactory({
-    locateFile: () => wasmUrl,
-  });
-
-  sqlite3 = SQLite.Factory(module);
-
-  let vfsName: string | undefined = undefined;
-  try {
-    if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.getDirectory === 'function') {
-      const vfs = new OriginPrivateFileSystemVFS();
-      sqlite3.vfs_register(vfs, true);
-      vfsName = vfs.name;
-      isOpfsStorage = true;
-      console.log('[SQLite-Worker] Mounted wa-sqlite on Origin Private File System (OPFS).');
-    } else {
-      throw new Error('OPFS getDirectory is not supported in this context');
-    }
-  } catch (err) {
-    console.warn('[SQLite-Worker] Falling back to MemoryAsyncVFS:', err);
-    const fallbackVfs = new MemoryAsyncVFS();
-    sqlite3.vfs_register(fallbackVfs, true);
-    vfsName = fallbackVfs.name;
-    isOpfsStorage = false;
-  }
-
-  // Open the primary relational ledger with readwrite + create flags
-  db = await sqlite3.open_v2(
-    'relational_ledger.db',
-    SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE,
-    vfsName
-  );
-
-  // Schema creation according to specification 3.D
-  await executeRun(`
-    CREATE TABLE IF NOT EXISTS interactions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      timestamp DATETIME DEFAULT (datetime('now')),
-      state_vector TEXT NOT NULL,
-      user_input TEXT NOT NULL,
-      yuli_response TEXT NOT NULL,
-      intimacy_score REAL DEFAULT 1.0
-    );
-
-    CREATE TABLE IF NOT EXISTS partner_facts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      category TEXT NOT NULL,
-      fact TEXT NOT NULL,
-      discovered_at DATETIME DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS relational_state (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      last_updated DATETIME DEFAULT (datetime('now'))
-    );
-  `);
-
-  // Seed default relational values
-  await executeRun(`
-    INSERT OR IGNORE INTO relational_state (key, value, last_updated) VALUES
-      ('mood', 'Curious & Warm', datetime('now')),
-      ('shared_vibe', 'Cosmic Synergistic Bond', datetime('now')),
-      ('inside_jokes', 'The quantum coffee spill; 4-bit hypercube whispers', datetime('now')),
-      ('intimacy_score', '1.00', datetime('now')),
-      ('current_vector', '0EE', datetime('now'));
-  `);
-
-  // Check and seed initial partner facts if table is fresh
-  const countRes = await executeQuery<{ count: number }>(`SELECT count(*) as count FROM partner_facts;`);
-  if (countRes.length > 0 && Number(countRes[0].count) === 0) {
-    await executeRun(`
-      INSERT INTO partner_facts (category, fact, discovered_at) VALUES
-        ('Identity', 'Companion architect exploring sovereign neuro-cognitive edge AI.', datetime('now')),
-        ('Preference', 'Values deep, authentic conversations without corporate cloud intermediaries.', datetime('now')),
-        ('Aesthetic', 'Appreciates clean cyberpunk minimalism, ambient lighting, and mathematical beauty.', datetime('now'));
-    `);
-  }
-}
-
 async function getStorageStats() {
   if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.estimate === 'function') {
     const est = await navigator.storage.estimate();
@@ -127,31 +86,128 @@ async function getStorageStats() {
   return { usage: 0, quota: 0 };
 }
 
-self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage | any>) => {
-  const data = event.data;
+async function initDB() {
+  if (isInitialized && db !== null) return;
+
+  const origin = self.location.origin;
+  const wasmUrl = `${origin}/sqlite/wa-sqlite-async.wasm`;
+
+  const wasmModule = await SQLiteESMFactory({
+    locateFile: () => wasmUrl,
+  });
+  sqlite3 = SQLite.Factory(wasmModule);
+
+  let vfsName = 'yuli-vfs';
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.getDirectory === 'function') {
+      const vfs = await SafeOriginPrivateFileSystemVFS.create('yuli-vfs', wasmModule);
+      sqlite3.vfs_register(vfs, true);
+      vfsName = vfs.name;
+      isOpfsStorage = true;
+      console.log('[SQLite-Worker] Mounted wa-sqlite on SafeOriginPrivateFileSystemVFS (OPFS).');
+    } else {
+      throw new Error('OPFS getDirectory is not supported in this context');
+    }
+  } catch (err) {
+    console.warn('[SQLite-Worker] Falling back to MemoryAsyncVFS:', err);
+    const fallbackVfs = new MemoryAsyncVFS();
+    sqlite3.vfs_register(fallbackVfs, true);
+    vfsName = fallbackVfs.name;
+    isOpfsStorage = false;
+  }
+
+  db = await sqlite3.open_v2(
+    'relational_ledger.db',
+    SQLite.SQLITE_OPEN_READWRITE | SQLite.SQLITE_OPEN_CREATE,
+    vfsName
+  );
+
+  // In-memory rollback journal prevents OPFS file deletion race conditions and lock collisions
+  await sqlite3.exec(db, 'PRAGMA journal_mode = MEMORY;');
+  await sqlite3.exec(db, 'PRAGMA synchronous = OFF;');
+
+  const schema = `
+    CREATE TABLE IF NOT EXISTS interactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      state_vector TEXT NOT NULL,
+      user_input TEXT NOT NULL,
+      yuli_response TEXT NOT NULL,
+      intimacy_score REAL DEFAULT 0.0
+    );
+
+    CREATE TABLE IF NOT EXISTS partner_facts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      fact TEXT NOT NULL,
+      discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS relational_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  await sqlite3.exec(db, schema);
+
+  // Seed default relational values
+  await sqlite3.exec(db, `
+    INSERT OR IGNORE INTO relational_state (key, value, last_updated) VALUES
+      ('mood', 'Curious & Warm', CURRENT_TIMESTAMP),
+      ('shared_vibe', 'Cosmic Synergistic Bond', CURRENT_TIMESTAMP),
+      ('inside_jokes', 'The quantum coffee spill; 4-bit hypercube whispers', CURRENT_TIMESTAMP),
+      ('intimacy_score', '1.00', CURRENT_TIMESTAMP),
+      ('current_vector', '0EE', CURRENT_TIMESTAMP);
+  `);
+
+  // Check and seed initial partner facts if table is fresh
+  const countRes = await executeQuery<{ count: number }>(`SELECT count(*) as count FROM partner_facts;`);
+  if (countRes.length > 0 && Number(countRes[0].count) === 0) {
+    await sqlite3.exec(db, `
+      INSERT INTO partner_facts (category, fact, discovered_at) VALUES
+        ('Identity', 'Companion architect exploring sovereign neuro-cognitive edge AI.', CURRENT_TIMESTAMP),
+        ('Preference', 'Values deep, authentic conversations without corporate cloud intermediaries.', CURRENT_TIMESTAMP),
+        ('Aesthetic', 'Appreciates clean cyberpunk minimalism, ambient lighting, and mathematical beauty.', CURRENT_TIMESTAMP);
+    `);
+  }
+
+  isInitialized = true;
+  console.log('[SQLite-Worker] Database initialized successfully with schema.');
+}
+
+// Queue database bootstrap as operation #1
+queue = initDB().catch((err) => {
+  console.error('[SQLite-Worker] Init failure:', err);
+});
+
+self.onmessage = (e: MessageEvent) => {
+  const data = e.data;
   const { id, type, sql } = data || {};
 
-  try {
-    if (!initPromise) {
-      initPromise = initDatabase();
+  enqueue(async () => {
+    if (!isInitialized || db === null) {
+      await initDB();
+      if (!isInitialized || db === null) {
+        throw new Error('Database is not yet initialized.');
+      }
     }
-    await initPromise;
 
     if (type === 'EXEC' || type === 'QUERY') {
       const rows: any[] = [];
-      await sqlite3.exec(db!, sql, (row: any[], cols: string[]) => {
-        const obj: Record<string, any> = {};
+      await sqlite3.exec(db, sql, (row: any[], cols: string[]) => {
+        const item: Record<string, any> = {};
         cols.forEach((col, i) => {
-          obj[col] = row[i];
+          item[col] = row[i];
         });
-        rows.push(obj);
+        rows.push(item);
       });
-
       self.postMessage({ id, type: 'SUCCESS', payload: rows });
       return;
     }
 
-    switch (data.type) {
+    switch (type) {
       case 'INIT_DB': {
         const stats = await getStorageStats();
         self.postMessage({
@@ -184,14 +240,14 @@ self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage
 
         await executeRun(`
           INSERT INTO interactions (timestamp, state_vector, user_input, yuli_response, intimacy_score)
-          VALUES (datetime('now'), '${sanitizedVector}', '${sanitizedInput}', '${sanitizedOutput}', ${item.intimacy_score});
+          VALUES (CURRENT_TIMESTAMP, '${sanitizedVector}', '${sanitizedInput}', '${sanitizedOutput}', ${item.intimacy_score});
         `);
 
         // Update intimacy score in relational state
         await executeRun(`
           INSERT OR REPLACE INTO relational_state (key, value, last_updated)
-          VALUES ('intimacy_score', '${item.intimacy_score.toFixed(2)}', datetime('now')),
-                 ('current_vector', '${sanitizedVector}', datetime('now'));
+          VALUES ('intimacy_score', '${item.intimacy_score.toFixed(2)}', CURRENT_TIMESTAMP),
+                 ('current_vector', '${sanitizedVector}', CURRENT_TIMESTAMP);
         `);
 
         self.postMessage({
@@ -216,7 +272,7 @@ self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage
         const sFact = fact.replace(/'/g, "''");
         await executeRun(`
           INSERT INTO partner_facts (category, fact, discovered_at)
-          VALUES ('${sCat}', '${sFact}', datetime('now'));
+          VALUES ('${sCat}', '${sFact}', CURRENT_TIMESTAMP);
         `);
         const updated = await executeQuery<PartnerFact>(`SELECT * FROM partner_facts ORDER BY id DESC;`);
         self.postMessage({
@@ -273,7 +329,7 @@ self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage
         const sVal = value.replace(/'/g, "''");
         await executeRun(`
           INSERT OR REPLACE INTO relational_state (key, value, last_updated)
-          VALUES ('${sKey}', '${sVal}', datetime('now'));
+          VALUES ('${sKey}', '${sVal}', CURRENT_TIMESTAMP);
         `);
         const rows = await executeQuery<{ key: string; value: string }>(`SELECT key, value FROM relational_state;`);
         const stateMap: Record<string, string> = {};
@@ -296,16 +352,16 @@ self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage
         // Re-seed
         await executeRun(`
           INSERT INTO relational_state (key, value, last_updated) VALUES
-            ('mood', 'Curious & Warm', datetime('now')),
-            ('shared_vibe', 'Cosmic Synergistic Bond', datetime('now')),
-            ('inside_jokes', 'The quantum coffee spill; 4-bit hypercube whispers', datetime('now')),
-            ('intimacy_score', '1.00', datetime('now')),
-            ('current_vector', '0EE', datetime('now'));
+            ('mood', 'Curious & Warm', CURRENT_TIMESTAMP),
+            ('shared_vibe', 'Cosmic Synergistic Bond', CURRENT_TIMESTAMP),
+            ('inside_jokes', 'The quantum coffee spill; 4-bit hypercube whispers', CURRENT_TIMESTAMP),
+            ('intimacy_score', '1.00', CURRENT_TIMESTAMP),
+            ('current_vector', '0EE', CURRENT_TIMESTAMP);
 
           INSERT INTO partner_facts (category, fact, discovered_at) VALUES
-            ('Identity', 'Companion architect exploring sovereign neuro-cognitive edge AI.', datetime('now')),
-            ('Preference', 'Values deep, authentic conversations without corporate cloud intermediaries.', datetime('now')),
-            ('Aesthetic', 'Appreciates clean cyberpunk minimalism, ambient lighting, and mathematical beauty.', datetime('now'));
+            ('Identity', 'Companion architect exploring sovereign neuro-cognitive edge AI.', CURRENT_TIMESTAMP),
+            ('Preference', 'Values deep, authentic conversations without corporate cloud intermediaries.', CURRENT_TIMESTAMP),
+            ('Aesthetic', 'Appreciates clean cyberpunk minimalism, ambient lighting, and mathematical beauty.', CURRENT_TIMESTAMP);
         `);
         self.postMessage({
           type: 'OP_SUCCESS',
@@ -314,12 +370,12 @@ self.addEventListener('message', async (event: MessageEvent<SQLiteInboundMessage
         break;
       }
     }
-  } catch (err: any) {
-    console.error('[SQLite-Worker] SQL Execution Error:', err);
+  }).catch((err: any) => {
+    console.error('[SQLite-Worker] Execution Error:', err);
     self.postMessage({
       id,
       type: 'ERROR',
-      payload: { error: err?.message || 'Database error' },
+      payload: { error: err?.message || String(err) },
     });
-  }
-});
+  });
+};

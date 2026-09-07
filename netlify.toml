@@ -45,12 +45,9 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Proxy GitHub release asset via Netlify 200 rewrite to bypass CORS redirect
-[[redirects]]
-  from = "/models/yuli.gguf"
-  to = "https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf"
-  status = 200
-  force = true
+[[edge_functions]]
+  path = "/models/yuli.gguf"
+  function = "model-proxy"
 
 # Single-Page Application (SPA) routing fallback
 [[redirects]]

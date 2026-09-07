@@ -11,9 +11,9 @@
 | **WASM Asset Distribution** | Completed | `vite-plugin-static-copy` configured for wllama & wa-sqlite WASM |
 | **Bitwise 4-Sides Math ($\mathbb{F}_2^4$)** | Completed | Deterministic XOR math, palette metadata, token parsing in `lib/bitwiseMath.ts` |
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
-| **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount, schema creation, seed facts, interactions & relational state CRUD. Guarded by initPromise and SQLITE_OPEN_CREATE flags. |
+| **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount via `SafeOriginPrivateFileSystemVFS` (intercepts NotFoundError), serialized FIFO mutex queue, in-memory journal mode to prevent Asyncify stack corruption and lock collisions |
 | **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction. Guarded against premature isMultithread() calls. |
-| **GGUF Model Delivery (Netlify Edge Proxy)** | Completed | Pointed `DEFAULT_MODEL_URL` to `/models/yuli.gguf` proxied via Netlify 200 rewrite rule from GitHub Releases v0.1.0 asset, with byte-range slicing |
+| **GGUF Model Delivery (Netlify Edge Function)** | Completed | Pointed `DEFAULT_MODEL_URL` to `/models/yuli.gguf` served by Netlify Edge Function (`model-proxy.ts`) following 302 redirects to Azure S3 server-side with full CORS and byte-range slicing |
 | **React UI & Sensory Shell** | Completed | `AmbientBackdrop`, `CognitiveHUD`, `ChatViewport`, `MemoryVaultModal`, `ModelProgressModal`, `StorageHealth` |
 | **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback) |
 | **Memory Bank Documentation** | Completed | 6 core files initialized and aligned with system realities |
@@ -21,8 +21,8 @@
 
 ## What Works
 - **Zero-Cloud Edge Inference**: Client-side execution via `@wllama/wllama` in dedicated worker.
-- **Netlify 200 Edge Rewrite Proxy**: Bypasses GitHub Release S3 302 CORS redirection by streaming `/models/yuli.gguf` on the server edge directly to browser Wllama worker cache with `Accept-Ranges: bytes`.
-- **Relational Ledger Persistence**: `wa-sqlite` over OPFS storing user interactions, intimacy score, and partner facts.
+- **Netlify Edge Function Model Proxy**: Streams `/models/yuli.gguf` from GitHub Releases following 302 redirects server-side, returning byte ranges with `Access-Control-Allow-Origin: *` and `Cross-Origin-Resource-Policy: cross-origin`.
+- **Serialized OPFS SQLite Persistence**: `wa-sqlite` over OPFS with FIFO mutex queue to prevent Asyncify concurrency faults, with `SafeOriginPrivateFileSystemVFS` guarding against `NotFoundError`.
 - **Dynamic 4-Sides Transformation**: Bitwise XOR transformations (`0EE` Ego, `1E6` Shadow, `2E7` Subconscious, `3E1` Superego) with synchronous ambient glow shifts.
 - **Collapsible Thought Streams**: Reasoning traces parsed out and displayed cleanly without bleeding into response text.
 - **Interactive Memory Vault**: Live CRUD interface for user memory inspection and relational state adjustments.
