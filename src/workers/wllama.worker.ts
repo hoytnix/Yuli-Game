@@ -38,7 +38,7 @@ async function initWllamaEngine(): Promise<Wllama> {
       error: (...args) => console.error('[Wllama-Worker]', ...args),
     },
     parallelDownloads: 3,
-    allowOffline: true,
+    allowOffline: false,
   });
 
   return wllamaInstance;
@@ -116,7 +116,22 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
               n_threads: navigator.hardwareConcurrency ? Math.max(1, Math.min(4, navigator.hardwareConcurrency - 1)) : 2,
             });
           } else {
-            // Check if model already in cache or stream from URL
+            // Validate existing cache integrity before loading
+            try {
+              const cacheName = await engine.cacheManager.getNameFromURL(targetUrl);
+              const meta = await engine.cacheManager.getMetadata(cacheName);
+              const size = await engine.cacheManager.getSize(cacheName);
+              if (meta && meta.originalSize > 0 && size > 0 && size !== meta.originalSize) {
+                console.warn(
+                  `[Wllama-Worker] Cached model size mismatch (${size} vs expected ${meta.originalSize} bytes). Purging corrupt cache...`
+                );
+                await engine.cacheManager.delete(targetUrl);
+              }
+            } catch (cacheCheckErr) {
+              console.warn('[Wllama-Worker] Cache check notice:', cacheCheckErr);
+            }
+
+            // Stream from URL with verified cache
             await engine.loadModelFromUrl(targetUrl, {
               useCache: true,
               n_ctx: 2048,
@@ -180,6 +195,12 @@ self.addEventListener('message', async (event: MessageEvent<WllamaInboundMessage
           });
         } catch (loadErr: any) {
           console.error('[Wllama-Worker] Failed to load model:', loadErr);
+          try {
+            const engine = await initWllamaEngine();
+            await engine.cacheManager.delete(targetUrl);
+          } catch {
+            // Ignore cache deletion errors
+          }
           self.postMessage({
             type: 'ERROR',
             payload: { message: loadErr?.message || 'Failed to load model from GitHub CDN' },

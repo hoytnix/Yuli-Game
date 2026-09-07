@@ -12,8 +12,8 @@
 | **Bitwise 4-Sides Math ($\mathbb{F}_2^4$)** | Completed | Deterministic XOR math, palette metadata, token parsing in `lib/bitwiseMath.ts` |
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
 | **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount via `SafeOriginPrivateFileSystemVFS` (intercepts NotFoundError), serialized FIFO mutex queue, in-memory journal mode to prevent Asyncify stack corruption and lock collisions |
-| **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction. Guarded against premature isMultithread() calls. |
-| **GGUF Model Delivery (Netlify Edge Function)** | Completed | `/models/yuli.gguf` served by Netlify Edge Function (`model-proxy.ts`) with manual 302 redirect resolution to Azure S3, preserving Range headers for fast, non-timing-out 206 byte slicing |
+| **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction, cache integrity size checks and automated corrupt file purging. |
+| **GGUF Model Delivery (Netlify Edge Function)** | Completed | `/models/yuli.gguf` served by Netlify Edge Function (`model-proxy.ts`) returning HTTP 307 redirect with CORS to signed Azure storage, avoiding 30s Netlify edge runtime timeout |
 | **React UI & Sensory Shell** | Completed | `AmbientBackdrop`, `CognitiveHUD`, `ChatViewport`, `MemoryVaultModal`, `ModelProgressModal`, `StorageHealth` |
 | **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback), worker auto-recreation on error to forcibly release OPFS locks |
 | **Memory Bank Documentation** | Completed | 6 core files initialized and aligned with system realities |
@@ -21,7 +21,7 @@
 
 ## What Works
 - **Zero-Cloud Edge Inference**: Client-side execution via `@wllama/wllama` in dedicated worker.
-- **Netlify Edge Function Model Proxy**: Resolves 302 redirects manually to Azure storage, streaming 206 Partial Content byte ranges with `Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin`, and `Accept-Ranges: bytes`.
+- **Netlify Edge Function Model Redirect**: Returns HTTP 307 redirect with CORS to direct Azure Blob storage, allowing full weight download without edge function timeout.
 - **Auto-Releasing OPFS Locks**: `useCognitiveEngine` terminates previous worker on error recovery so browser releases all open OPFS file handles without `NoModificationAllowedError`.
 - **Serialized OPFS SQLite Persistence**: `wa-sqlite` over OPFS with FIFO mutex queue to prevent Asyncify concurrency faults, with `SafeOriginPrivateFileSystemVFS` guarding against `NotFoundError`.
 - **Dynamic 4-Sides Transformation**: Bitwise XOR transformations (`0EE` Ego, `1E6` Shadow, `2E7` Subconscious, `3E1` Superego) with synchronous ambient glow shifts.

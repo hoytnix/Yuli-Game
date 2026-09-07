@@ -1,21 +1,21 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Resolved GitHub Releases 302 redirect `Range` stripping in `netlify/edge-functions/model-proxy.ts` by resolving redirect with `redirect: "manual"` and streaming byte-range slices directly from upstream storage without timeout severance.
-- Resolved `NoModificationAllowedError` on OPFS cache cleanup by automatically terminating the previous Web Worker in `src/hooks/useCognitiveEngine.ts` upon error recovery to release open OPFS file locks.
+- Updated Netlify Edge Function (`model-proxy.ts`) to return an HTTP 307 redirect with CORS headers (`Location: <Azure Signed URL>`), allowing the browser to stream directly from Azure storage without hitting Netlify's 30-second edge function execution timeout.
+- Hardened Wllama cache management in `src/workers/wllama.worker.ts`: set `allowOffline: false` in `initWllamaEngine`, added automatic validation of cached file size against `metadata.originalSize`, and added automated purging of corrupt/truncated cache files on load failure.
 
 ## Current Work Stream
-- Updated `netlify/edge-functions/model-proxy.ts` to resolve GitHub 302 redirects manually to Azure storage (`release-assets.githubusercontent.com`), preserving `Range` and returning `206 Partial Content` slices with full CORS and CORP headers.
-- Updated `src/hooks/useCognitiveEngine.ts` to terminate `workerRef.current` and recreate a fresh worker on retry/error recovery, auto-releasing browser OPFS locks.
-- Added `READY` and `PROGRESS` outbound message variants in `src/types/index.ts`.
+- Verified local GGUF file size (`1,200,590,848` bytes) and magic bytes (`GGUF`), confirming 100% byte-for-byte identity with GitHub Releases remote `Content-Length`.
+- Replaced streaming proxy in `netlify/edge-functions/model-proxy.ts` with HTTP 307 redirect.
+- Added cache pre-validation and error cache purge in `src/workers/wllama.worker.ts`.
 
 ## Recent State Changes
 - Modified `netlify/edge-functions/model-proxy.ts`.
-- Modified `src/hooks/useCognitiveEngine.ts`.
-- Modified `src/types/index.ts`.
-- Verified clean compilation with `tsc --noEmit`.
+- Modified `src/workers/wllama.worker.ts`.
+- Confirmed zero errors with `pnpm exec tsc --noEmit`.
 
 ## Next Immediate Steps
-- Clear corrupted ~100MB fragment from browser OPFS (`navigator.storage.getDirectory()`).
-- Verify smooth Wllama model download with 206 Partial Content slices in production.
+- Push changes to origin main to trigger Netlify deployment.
+- Wipe existing corrupted model fragment from browser OPFS via DevTools console.
+- Test clean 307 redirect model load in browser.
 
