@@ -1,0 +1,24 @@
+{
+  "name": "Project Yuli: Sovereign Neuro-Cognitive Companion",
+  "short_name": "Yuli",
+  "description": "Standalone sovereign edge AI companion with in-browser GGUF execution, 4-Sides cognitive architecture, and OPFS SQLite persistence.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07080d",
+  "theme_color": "#F59E0B",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
