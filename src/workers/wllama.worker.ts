@@ -23,26 +23,32 @@ self.onmessage = async (e: MessageEvent) => {
   if (type === 'INIT' || type === 'INIT_MODEL') {
     const { modelUrl = '/models/yuli.gguf', customBlob } = payload || {};
 
-    if (isLoaded) {
+    if (isLoaded && wllama?.isModelLoaded()) {
       self.postMessage({ type: 'READY' });
       return;
     }
     if (isLoading) {
-      console.warn('[Wllama-Worker] Load already in progress, ignoring duplicate.');
+      console.warn('[Wllama-Worker] Model loading in progress, skipping duplicate INIT.');
       return;
     }
 
     isLoading = true;
+    isLoaded = false;
 
     try {
-      if (!wllama) {
-        wllama = new Wllama(CONFIG_PATHS, {
-          allowOffline: true,
-          parallelDownloads: 1,
-        });
+      if (wllama) {
+        try {
+          await wllama.exit();
+        } catch (_) {}
+        wllama = null;
       }
 
-      console.log('[Wllama-Worker] Initializing model load from:', customBlob ? 'custom blob' : modelUrl);
+      wllama = new Wllama(CONFIG_PATHS, {
+        allowOffline: true,
+        parallelDownloads: 1,
+      });
+
+      console.log('[Wllama-Worker] Loading model from URL:', customBlob ? 'custom blob' : modelUrl);
 
       if (customBlob) {
         await wllama.loadModel([customBlob], {
@@ -53,7 +59,6 @@ self.onmessage = async (e: MessageEvent) => {
       } else {
         await wllama.loadModelFromUrl(modelUrl, {
           useCache: true,
-          // Conservative context settings to ensure stable WASM memory limits
           n_ctx: 2048,
           n_batch: 512,
           n_threads: Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1)),
@@ -70,6 +75,16 @@ self.onmessage = async (e: MessageEvent) => {
         });
       }
 
+      // Crucial: Verify that C++ runtime actually initialized the model
+      if (!wllama.isModelLoaded()) {
+        try {
+          if (!customBlob) {
+            await wllama.cacheManager?.delete(modelUrl);
+          }
+        } catch (_) {}
+        throw new Error('Model failed internal validation: file is corrupt or truncated.');
+      }
+
       isLoaded = true;
       isLoading = false;
       console.log('[Wllama-Worker] Model successfully loaded and ready.');
@@ -77,8 +92,20 @@ self.onmessage = async (e: MessageEvent) => {
     } catch (err: any) {
       isLoading = false;
       isLoaded = false;
-      wllama = null;
-      console.error('[Wllama-Worker] Failed to load model:', err);
+      console.error('[Wllama-Worker] Model load failed:', err);
+
+      if (wllama) {
+        try {
+          if (!customBlob) {
+            await wllama.cacheManager?.delete(modelUrl);
+          }
+        } catch (_) {}
+        try {
+          await wllama.exit();
+        } catch (_) {}
+        wllama = null;
+      }
+
       self.postMessage({
         type: 'ERROR',
         payload: err?.message || String(err),
@@ -87,10 +114,10 @@ self.onmessage = async (e: MessageEvent) => {
   }
 
   if (type === 'COMPLETION' || type === 'GENERATE') {
-    if (!wllama || !isLoaded) {
+    if (!wllama || !isLoaded || !wllama.isModelLoaded()) {
       self.postMessage({
         type: 'ERROR',
-        payload: 'Model is not loaded yet.',
+        payload: 'Model is not initialized or still corrupted in cache.',
       });
       return;
     }
@@ -208,7 +235,7 @@ self.onmessage = async (e: MessageEvent) => {
   }
 
   if (type === 'CHECK_STATUS') {
-    if (isLoaded) {
+    if (isLoaded && wllama?.isModelLoaded()) {
       self.postMessage({ type: 'READY' });
     } else if (isLoading) {
       self.postMessage({

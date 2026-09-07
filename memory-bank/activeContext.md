@@ -1,23 +1,23 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Eliminated the WASM memory alignment fault (`RangeError: Invalid typed array length: 1163217991` / `std::bad_function_call`) during post-load inference triggering.
-- Sanitized completion options (`nPredict`, `temp`, `topP`, `topK`, `stopTrigger`) before passing into `@wllama/wllama`'s C++ bindings.
-- Normalized `createCompletion` invocation parameters to prevent string spreading into WASM linear memory and ensured conservative context allocation (`n_ctx: 2048`, `n_batch: 512`, `n_threads`).
-- Updated `useCognitiveEngine` hook to handle streaming `TOKEN` messages, sanitized `COMPLETION` payloads, and provided `generate` helper.
+- Hardened Wllama Web Worker against false READY states by validating `wllama.isModelLoaded()` before dispatching `READY`.
+- Implemented automatic OPFS cache purging via `cacheManager.delete(modelUrl)` upon validation or load failure to prevent stuck corrupted weight files.
+- Guarded `COMPLETION` and `CHECK_STATUS` message handlers against uninitialized or partially loaded WASM contexts to prevent memory faults (`RangeError: Invalid typed array length` / `std::bad_function_call`).
+- Verified edge function direct header and 206 Partial Content range streaming in `netlify/edge-functions/model-proxy.ts`.
 
 ## Current Work Stream
-- Sanitized options in `src/workers/wllama.worker.ts` and set conservative context bounds during `loadModelFromUrl`.
-- Harmonized IPC protocol in `src/types/index.ts` and `src/hooks/useCognitiveEngine.ts` for dual `TOKEN`/`SUCCESS`/`COMPLETE` streaming.
+- Added `wllama.isModelLoaded()` validation in `src/workers/wllama.worker.ts`.
+- Added automatic cache deletion on corrupted/truncated model load failure.
 - Verified zero TypeScript errors (`pnpm exec tsc --noEmit`) and successful production build (`pnpm build`).
 
 ## Recent State Changes
 - Modified `src/workers/wllama.worker.ts`.
-- Modified `src/hooks/useCognitiveEngine.ts`.
-- Modified `src/types/index.ts`.
-- Confirmed zero errors with `pnpm exec tsc --noEmit` and clean build with `pnpm build`.
+- Verified `netlify/edge-functions/model-proxy.ts` range streaming and header forwarding.
+- Re-verified production build (`dist/assets/wllama.worker-*.js`).
 
 ## Next Immediate Steps
 - Push changes to origin main to trigger Netlify deployment.
-- Verify smooth model inference in browser without memory bounds violation.
+- Clear browser OPFS cache in DevTools if a corrupted model slice was previously persisted.
+- Verify clean GGUF model download and completion inference in production.
 
