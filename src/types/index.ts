@@ -96,6 +96,8 @@ export type WllamaInboundMessage =
 
 export type WllamaOutboundMessage =
   | { type: 'STATUS_UPDATE'; payload: Partial<ModelLoadProgress> }
+  | { type: 'READY'; payload?: { isMultithread?: boolean } }
+  | { type: 'PROGRESS'; payload: { loaded: number; total: number; percentage: number } }
   | { type: 'TOKEN'; payload: { id: string; token: string; rawAccumulated: string } }
   | {
       type: 'COMPLETE';

@@ -32,6 +32,7 @@ export function useCognitiveEngine() {
   ]);
 
   const [activeVector, setActiveVector] = useState<StateVector>('0EE');
+  const activeVectorRef = useRef<StateVector>('0EE');
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingThoughts, setStreamingThoughts] = useState('');
   const [streamingContent, setStreamingContent] = useState('');
@@ -57,12 +58,10 @@ export function useCognitiveEngine() {
   const startTimeRef = useRef<number>(0);
   const tokenCountRef = useRef<number>(0);
 
-  // Initialize Worker
-  useEffect(() => {
+  const createWorker = useCallback(() => {
     const worker = new Worker(new URL('../workers/wllama.worker.ts', import.meta.url), {
       type: 'module',
     });
-    workerRef.current = worker;
 
     worker.onmessage = (event: MessageEvent<WllamaOutboundMessage>) => {
       const { type, payload } = event.data;
@@ -70,6 +69,27 @@ export function useCognitiveEngine() {
       switch (type) {
         case 'STATUS_UPDATE':
           setModelProgress((prev) => ({ ...prev, ...payload }));
+          break;
+
+        case 'READY':
+          setModelProgress((prev) => ({
+            ...prev,
+            status: 'ready',
+            percentage: 100,
+            error: undefined,
+            isCached: true,
+            ...(payload?.isMultithread !== undefined ? { multiThreadSupported: payload.isMultithread } : {}),
+          }));
+          break;
+
+        case 'PROGRESS':
+          setModelProgress((prev) => ({
+            ...prev,
+            status: 'downloading',
+            loadedBytes: payload.loaded,
+            totalBytes: payload.total,
+            percentage: payload.percentage,
+          }));
           break;
 
         case 'TOKEN': {
@@ -85,13 +105,14 @@ export function useCognitiveEngine() {
 
           // Stream parse thoughts and clean text
           const { cleanText, thoughtText, isThinking: thinkingNow } = parseThoughtStream(rawAccumulated);
-          const { stateVector, cleanedText } = extractStateVector(cleanText, activeVector);
+          const { stateVector, cleanedText } = extractStateVector(cleanText, activeVectorRef.current);
 
           setStreamingThoughts(thoughtText);
           setStreamingContent(cleanedText);
           setIsThinking(thinkingNow);
 
-          if (stateVector !== activeVector) {
+          if (stateVector !== activeVectorRef.current) {
+            activeVectorRef.current = stateVector;
             setActiveVector(stateVector);
           }
           break;
@@ -122,6 +143,7 @@ export function useCognitiveEngine() {
             };
 
             setMessages((prev) => [...prev, finalMsg]);
+            activeVectorRef.current = stateVector;
             setActiveVector(stateVector);
             setIsGenerating(false);
             setStreamingThoughts('');
@@ -136,10 +158,18 @@ export function useCognitiveEngine() {
           console.warn('[useCognitiveEngine] Worker error notice:', payload.message);
           setIsGenerating(false);
           setIsThinking(false);
-          setModelProgress((prev) => ({ ...prev, error: payload.message }));
+          setModelProgress((prev) => ({ ...prev, status: 'error', error: payload.message }));
           break;
       }
     };
+
+    return worker;
+  }, []);
+
+  // Initialize Worker
+  useEffect(() => {
+    const worker = createWorker();
+    workerRef.current = worker;
 
     // Check capability and status
     worker.postMessage({ type: 'CHECK_STATUS' } satisfies WllamaInboundMessage);
@@ -148,16 +178,39 @@ export function useCognitiveEngine() {
       worker.terminate();
       workerRef.current = null;
     };
-  }, []);
+  }, [createWorker]);
 
-  const loadModel = useCallback((modelUrl?: string, customBlob?: Blob) => {
-    if (!workerRef.current) return;
-    setModelProgress((prev) => ({ ...prev, status: 'downloading', percentage: 0, error: undefined }));
-    workerRef.current.postMessage({
-      type: 'INIT_MODEL',
-      payload: { modelUrl: modelUrl || DEFAULT_MODEL_URL, customBlob },
-    } satisfies WllamaInboundMessage);
-  }, []);
+  const initEngine = useCallback(
+    async (customUrl?: string, customBlob?: Blob) => {
+      if (modelProgress.status === 'downloading' || modelProgress.status === 'compiling_wasm') {
+        return;
+      }
+
+      // If recovering from an error, terminate the old worker to release any OPFS file locks
+      if (modelProgress.error && workerRef.current) {
+        workerRef.current.terminate();
+        const freshWorker = createWorker();
+        workerRef.current = freshWorker;
+      } else if (!workerRef.current) {
+        workerRef.current = createWorker();
+      }
+
+      setModelProgress((prev) => ({
+        ...prev,
+        status: 'downloading',
+        percentage: 0,
+        error: undefined,
+      }));
+
+      workerRef.current?.postMessage({
+        type: 'INIT_MODEL',
+        payload: { modelUrl: customUrl || DEFAULT_MODEL_URL, customBlob },
+      } satisfies WllamaInboundMessage);
+    },
+    [modelProgress.status, modelProgress.error, createWorker]
+  );
+
+  const loadModel = initEngine;
 
   const abortGeneration = useCallback(() => {
     if (!workerRef.current) return;
@@ -315,6 +368,7 @@ Yuli:`;
   );
 
   const setManualVector = useCallback((vector: StateVector) => {
+    activeVectorRef.current = vector;
     setActiveVector(vector);
   }, []);
 
@@ -328,6 +382,7 @@ Yuli:`;
     generationStats,
     modelProgress,
     loadModel,
+    initEngine,
     sendMessage,
     abortGeneration,
     setManualVector,

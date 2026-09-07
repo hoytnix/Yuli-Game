@@ -1,21 +1,21 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Resolved GitHub Releases CORS redirect block via Netlify Edge Function (`netlify/edge-functions/model-proxy.ts`) with server-side 302 follow and byte-range streaming.
-- Resolved wa-sqlite Asyncify stack corruption by introducing a sequential FIFO queue and `SafeOriginPrivateFileSystemVFS` in `src/workers/sqlite.worker.ts`.
+- Resolved GitHub Releases 302 redirect `Range` stripping in `netlify/edge-functions/model-proxy.ts` by resolving redirect with `redirect: "manual"` and streaming byte-range slices directly from upstream storage without timeout severance.
+- Resolved `NoModificationAllowedError` on OPFS cache cleanup by automatically terminating the previous Web Worker in `src/hooks/useCognitiveEngine.ts` upon error recovery to release open OPFS file locks.
 
 ## Current Work Stream
-- Created `netlify/edge-functions/model-proxy.ts` to stream GitHub Releases directly using server-side fetch with `redirect: "follow"` and full CORS headers (`Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin`, `Accept-Ranges: bytes`).
-- Removed `/models/yuli.gguf` rewrite rule from `public/_redirects` and added `[[edge_functions]]` definition to `netlify.toml`.
-- Replaced `src/workers/sqlite.worker.ts` with serialized FIFO queue implementation, intercepting `NotFoundError` during OPFS file operations (`SafeOriginPrivateFileSystemVFS`), switching to in-memory rollback journal (`PRAGMA journal_mode = MEMORY; PRAGMA synchronous = OFF;`), and queuing all inbound messages.
+- Updated `netlify/edge-functions/model-proxy.ts` to resolve GitHub 302 redirects manually to Azure storage (`release-assets.githubusercontent.com`), preserving `Range` and returning `206 Partial Content` slices with full CORS and CORP headers.
+- Updated `src/hooks/useCognitiveEngine.ts` to terminate `workerRef.current` and recreate a fresh worker on retry/error recovery, auto-releasing browser OPFS locks.
+- Added `READY` and `PROGRESS` outbound message variants in `src/types/index.ts`.
 
 ## Recent State Changes
-- Created `netlify/edge-functions/model-proxy.ts`.
-- Updated `netlify.toml` and `public/_redirects`.
-- Rewrote `src/workers/sqlite.worker.ts` with serialized execution queue.
-- Verified build and TypeScript compilation pass cleanly.
+- Modified `netlify/edge-functions/model-proxy.ts`.
+- Modified `src/hooks/useCognitiveEngine.ts`.
+- Modified `src/types/index.ts`.
+- Verified clean compilation with `tsc --noEmit`.
 
 ## Next Immediate Steps
-- Push changes to GitHub/Netlify.
-- Clear OPFS storage if testing in browser with old lockfiles (`navigator.storage.getDirectory()`).
-- Verify smooth Wllama model download and OPFS SQLite database operations in production.
+- Clear corrupted ~100MB fragment from browser OPFS (`navigator.storage.getDirectory()`).
+- Verify smooth Wllama model download with 206 Partial Content slices in production.
+
