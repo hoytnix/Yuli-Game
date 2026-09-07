@@ -21,7 +21,10 @@ self.onmessage = async (e: MessageEvent) => {
   const { type, payload } = e.data || {};
 
   if (type === 'INIT' || type === 'INIT_MODEL') {
-    const { modelUrl = '/models/yuli.gguf', customBlob } = payload || {};
+    const {
+      modelUrl = 'https://huggingface.co/colaformybatteries/yuli-0.1.0-e2b/resolve/main/yuli-0.1.0-e2b.Q4_K_M.gguf',
+      customBlob,
+    } = payload || {};
 
     if (isLoaded && wllama?.isModelLoaded()) {
       self.postMessage({ type: 'READY' });

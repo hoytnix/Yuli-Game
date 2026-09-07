@@ -1,18 +1,28 @@
 import { StateVector } from '../types';
 
-export const DEFAULT_MODEL_URL = '/models/yuli.gguf';
+export const HF_MODEL_URL =
+  'https://huggingface.co/colaformybatteries/yuli-0.1.0-e2b/resolve/main/yuli-0.1.0-e2b.Q4_K_M.gguf';
+
+export const DEFAULT_MODEL_URL = HF_MODEL_URL;
 
 export const FALLBACK_MODEL_URL =
   'https://github.com/hoytnix/Yuli-Game/releases/download/v0.1.0/yuli-0.1.0-e2b.Q4_K_M.gguf';
 
-export const DEFAULT_MODEL_NAME = 'yuli.gguf';
+export const DEFAULT_MODEL_NAME = 'yuli-0.1.0-e2b.Q4_K_M.gguf';
 
 // High-speed CDN mirror staging and local path fallback
 export const MODEL_OPTIONS = [
   {
+    id: 'yuli-huggingface',
+    name: 'Yuli 0.1.0 E2B (Hugging Face Direct)',
+    url: HF_MODEL_URL,
+    sizeLabel: '~1.5 GB',
+    description: 'Official v0.1.0 Sovereign weights via Hugging Face resolve URL (native CORS & Range requests)',
+  },
+  {
     id: 'yuli-netlify-proxy',
     name: 'Yuli 0.1.0 E2B (Netlify Edge Proxy)',
-    url: DEFAULT_MODEL_URL,
+    url: '/models/yuli.gguf',
     sizeLabel: '~1.5 GB',
     description: 'Official v0.1.0 Sovereign weights streamed via Netlify 200 rewrite (bypasses browser CORS)',
   },

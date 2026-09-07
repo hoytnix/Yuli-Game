@@ -19,6 +19,8 @@ import {
 } from '../lib/constants';
 import { getCircadianMetrics } from '../lib/circadian';
 
+const HF_MODEL_URL = 'https://huggingface.co/colaformybatteries/yuli-0.1.0-e2b/resolve/main/yuli-0.1.0-e2b.Q4_K_M.gguf';
+
 export function useCognitiveEngine() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -233,7 +235,7 @@ export function useCognitiveEngine() {
       const worker = spawnWorker();
       worker.postMessage({
         type: 'INIT',
-        payload: { modelUrl: customUrl || DEFAULT_MODEL_URL, customBlob },
+        payload: { modelUrl: customUrl || HF_MODEL_URL, customBlob },
       } satisfies WllamaInboundMessage);
     },
     [modelProgress.error, spawnWorker]

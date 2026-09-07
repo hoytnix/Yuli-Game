@@ -1,23 +1,22 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Hardened Wllama Web Worker against false READY states by validating `wllama.isModelLoaded()` before dispatching `READY`.
-- Implemented automatic OPFS cache purging via `cacheManager.delete(modelUrl)` upon validation or load failure to prevent stuck corrupted weight files.
-- Guarded `COMPLETION` and `CHECK_STATUS` message handlers against uninitialized or partially loaded WASM contexts to prevent memory faults (`RangeError: Invalid typed array length` / `std::bad_function_call`).
-- Verified edge function direct header and 206 Partial Content range streaming in `netlify/edge-functions/model-proxy.ts`.
+- Configured direct download of model weights from Hugging Face resolve URL (`https://huggingface.co/colaformybatteries/yuli-0.1.0-e2b/resolve/main/yuli-0.1.0-e2b.Q4_K_M.gguf`).
+- Eliminated dependency on Netlify edge proxy for model streaming, leveraging native Hugging Face CORS and HTTP Range support.
+- Avoided redirect/bounds errors associated with external proxies and redirect chains.
 
 ## Current Work Stream
-- Added `wllama.isModelLoaded()` validation in `src/workers/wllama.worker.ts`.
-- Added automatic cache deletion on corrupted/truncated model load failure.
+- Updated `src/hooks/useCognitiveEngine.ts` to use `HF_MODEL_URL` as default model URL.
+- Updated `src/lib/constants.ts` and `src/workers/wllama.worker.ts` to point directly to Hugging Face resolve URL.
 - Verified zero TypeScript errors (`pnpm exec tsc --noEmit`) and successful production build (`pnpm build`).
 
 ## Recent State Changes
-- Modified `src/workers/wllama.worker.ts`.
-- Verified `netlify/edge-functions/model-proxy.ts` range streaming and header forwarding.
-- Re-verified production build (`dist/assets/wllama.worker-*.js`).
+- Updated `src/hooks/useCognitiveEngine.ts`, `src/lib/constants.ts`, and `src/workers/wllama.worker.ts`.
+- Rebuilt production bundle (`dist/assets/wllama.worker-*.js`).
 
 ## Next Immediate Steps
 - Push changes to origin main to trigger Netlify deployment.
-- Clear browser OPFS cache in DevTools if a corrupted model slice was previously persisted.
-- Verify clean GGUF model download and completion inference in production.
+- Clear browser OPFS cache in DevTools if prior weights were partially cached.
+- Verify clean GGUF model download, range streaming, and inference directly from Hugging Face.
+
 
