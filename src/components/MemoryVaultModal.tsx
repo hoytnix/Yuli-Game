@@ -330,17 +330,28 @@ export const MemoryVaultModal: React.FC<MemoryVaultModalProps> = ({
 
         {/* Modal Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800/80 bg-slate-950/60 flex items-center justify-between">
-          <button
-            onClick={() => {
-              if (window.confirm('Reset SQLite relational ledger to initial seed state?')) {
-                onResetDB();
-              }
-            }}
-            className="flex items-center gap-1 text-xs text-rose-400/80 hover:text-rose-400 hover:underline transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Database
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (window.confirm('Reset SQLite relational ledger to initial seed state?')) {
+                  onResetDB();
+                }
+              }}
+              className="flex items-center gap-1 text-xs text-rose-400/80 hover:text-rose-400 hover:underline transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset Database
+            </button>
+            <span className="text-slate-700 hidden sm:inline">|</span>
+            <a
+              href="https://tehwiz.com"
+              target="_blank"
+              rel="noopener"
+              className="text-[11px] font-mono text-slate-500 hover:text-amber-400 transition-colors hidden sm:inline"
+            >
+              TehWiz Productions
+            </a>
+          </div>
 
           <button
             onClick={onClose}

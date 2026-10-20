@@ -212,12 +212,22 @@ export const ModelProgressModal: React.FC<ModelProgressModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
-          >
-            Dismiss
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+            >
+              Dismiss
+            </button>
+            <a
+              href="https://isicecakeoisis.com"
+              target="_blank"
+              rel="noopener"
+              className="text-[11px] font-mono text-slate-500 hover:text-indigo-400 transition-colors hidden sm:inline"
+            >
+              isicecakeoisis.com
+            </a>
+          </div>
 
           <button
             onClick={() => {

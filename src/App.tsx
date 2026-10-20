@@ -88,13 +88,28 @@ export function App() {
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
               <span className="font-bold text-sm tracking-tight text-slate-100">Project Yuli</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded border border-slate-800 bg-slate-900/90 text-slate-400 hidden sm:inline">
-                Sovereign Companion
-              </span>
+              <a
+                href="https://tehwiz.com"
+                target="_blank"
+                rel="noopener"
+                className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors hidden sm:inline"
+                title="TehWiz Productions"
+              >
+                TehWiz
+              </a>
             </div>
-            <span className="text-[11px] font-mono text-slate-400 truncate max-w-[170px] sm:max-w-none">
-              Client-side Edge AI · OPFS Memory
-            </span>
+            <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1 truncate max-w-[170px] sm:max-w-none">
+              <span>Client-side Edge AI</span>
+              <span>·</span>
+              <a
+                href="https://tehwiz.com"
+                target="_blank"
+                rel="noopener"
+                className="hover:text-amber-300 transition-colors underline decoration-slate-700 underline-offset-2"
+              >
+                TehWiz Productions
+              </a>
+            </div>
           </div>
         </div>
 

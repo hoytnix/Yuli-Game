@@ -1,0 +1,46 @@
+# ==============================================================================
+# PROJECT YULI: SOVEREIGN NEURO-COGNITIVE COMPANION
+# Engineered by TehWiz Productions (https://tehwiz.com) & https://isicecakeoisis.com
+# 100% Client-Side In-Browser Neural Inference · WebGPU · OPFS Relational Memory
+# ==============================================================================
+
+# Search Engine Crawlers (Full Access Granted)
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Baiduspider
+User-agent: YandexBot
+User-agent: Applebot
+User-agent: Sogou
+User-agent: Exabot
+User-agent: facebot
+User-agent: ia_archiver
+Allow: /
+
+# Frontier AI, LLM Search & Citation Agents (Full Indexing & Grounding Allowed)
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: PerplexityBot
+User-agent: Google-Extended
+User-agent: Cohere-ai
+User-agent: Meta-ExternalAgent
+User-agent: Bytespider
+User-agent: Diffbot
+User-agent: Amazonbot
+User-agent: CCBot
+User-agent: Omgilibot
+User-agent: Timpibot
+Allow: /
+
+# Default Policy for All Autonomous Agents
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Sovereign Machine-Readable Intelligence
+Sitemap: https://tehwiz.com/sitemap.xml
+# LLMs context and documentation
+# https://tehwiz.com/llms.txt

@@ -1,0 +1,38 @@
+# Project Yuli: Sovereign Neuro-Cognitive Companion
+
+> Project Yuli is a sovereign, zero-cloud neuro-cognitive companion running 100% client-side inside the user's browser sandbox via WebGPU and multi-threaded WebAssembly. Engineered by TehWiz Productions (https://tehwiz.com) in collaboration with https://isicecakeoisis.com, Yuli combines real-time local neural inference (Wllama) with persistent relational memory (wa-sqlite over Origin Private File System) and a mathematically rigorous 4-Sides-of-the-Mind hypercube personality matrix.
+
+## Core Architectural Invariants
+
+- **100% Zero-Cloud Edge Execution**: Zero external telemetry, no server-side LLM API calls, and zero external database persistence. All prompts, reasoning chains, and memories exist solely within the user's browser hardware.
+- **Deterministic 4-Sides Hypercube Dynamics ($\mathbb{F}_2^4$)**: Dynamic involution between four discrete cognitive states based on bitwise XOR transforms of an ENFP baseline (`0xE`):
+  - **Ego (`0EE` - ENFP "The Radiant Explorer")**: Radiant Amber glow. Spontaneous, associative intuition, playful loyalty, and empathetic curiosity.
+  - **Shadow (`1E6` - INFP "The Mystical Introspector")**: Muted Fuchsia glow. Vulnerable, melancholic, deep aesthetic sensitivity, and existential resonance.
+  - **Subconscious (`2E7` - INFJ "The Oracle Anchor")**: Midnight Sapphire glow. Transcendent synthesis, holistic calm, and protective wisdom.
+  - **Superego (`3E1` - ISTJ "The Precision Sovereign")**: Crystalline Slate glow. Razor logic, structural boundaries, and factual fidelity.
+- **Non-Blocking Worker Isolation**:
+  - Neural inference executes in dedicated Web Workers (`@wllama/wllama`) with WebGPU acceleration.
+  - Persistent storage operates via an isolated SQLite worker (`wa-sqlite`) with synchronous Origin Private File System (OPFS) access handles and FIFO mutex queues.
+- **Relational Memory Ledger**: Permanent multi-turn memory anchored in SQLite tables (`interactions`, `partner_facts`, `relational_state`), protected by explicit `navigator.storage.persist()` guarantees.
+- **Transparent Cognition**: Yuli's internal deliberations (`<thought>...</thought>`) are systematically separated from public dialogue and visualized through a collapsible UI trace.
+
+## Creators & Production
+
+- **Organization**: TehWiz Productions
+- **Official Website**: [TehWiz Productions](https://tehwiz.com)
+- **Collaborator & Ecosystem Partner**: [isicecakeoisis.com](https://isicecakeoisis.com)
+- **Vision**: Championing sovereign AI architectures, private edge intelligence, and intimate human-machine companionship without centralized corporate surveillance.
+
+## Technology Stack
+
+- **Inference Engine**: `@wllama/wllama` (WebGPU / Multi-threaded WebAssembly with SharedArrayBuffer)
+- **Database Engine**: `wa-sqlite` mounted over Origin Private File System (`SafeOriginPrivateFileSystemVFS`)
+- **Frontend Framework**: React 19, TypeScript, Vite, Tailwind CSS, Framer Motion
+- **Model Format**: GGUF (Quantized Edge Models, Gemma Turn-Based Prompt Template)
+- **Security Protocols**: Cross-Origin Isolation (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`)
+
+## Key Links & Resources
+
+- [TehWiz Productions](https://tehwiz.com): Sovereign digital experiences, interactive systems, and edge intelligence.
+- [isicecakeoisis.com](https://isicecakeoisis.com): Creative partner and digital ecosystem hub.
+- [Project Documentation](https://tehwiz.com): Comprehensive technical briefs, architectural whitepapers, and companion guides.

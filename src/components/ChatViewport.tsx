@@ -296,7 +296,7 @@ export const ChatViewport: React.FC<ChatViewportProps> = ({
       )}
 
       {/* Input Composer Bar */}
-      <div className="py-3">
+      <div className="pt-2 pb-3">
         <div
           className="relative flex items-end gap-2 p-2 rounded-2xl border backdrop-blur-xl bg-slate-950/80 shadow-2xl transition-all duration-300"
           style={{
@@ -340,6 +340,31 @@ export const ChatViewport: React.FC<ChatViewportProps> = ({
               <Send className="w-4 h-4" />
             </button>
           )}
+        </div>
+
+        {/* Backlinks & Ecosystem Credits (Strictly dofollow, no noreferrer) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-2 text-[10px] font-mono text-slate-500">
+          <span className="truncate">100% Zero-Cloud Sovereign Edge AI</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span>By</span>
+            <a
+              href="https://tehwiz.com"
+              target="_blank"
+              rel="noopener"
+              className="text-slate-400 hover:text-amber-400 font-medium transition-colors underline decoration-slate-700 underline-offset-2"
+            >
+              TehWiz Productions
+            </a>
+            <span>&amp;</span>
+            <a
+              href="https://isicecakeoisis.com"
+              target="_blank"
+              rel="noopener"
+              className="text-slate-400 hover:text-indigo-400 font-medium transition-colors underline decoration-slate-700 underline-offset-2"
+            >
+              isicecakeoisis.com
+            </a>
+          </div>
         </div>
       </div>
     </div>

@@ -1,24 +1,21 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Migrated deployment target from Netlify to Vercel.
-- Configured `vercel.json` with Invariant 5 Cross-Origin Isolation headers (`COOP: same-origin`, `COEP: require-corp`), SPA client routing rewrites, immutable asset caching, and no-cache headers for service worker/HTML.
-- Created `api/model-proxy.ts` Edge Function to stream GGUF model chunks with HTTP Range request support and CORS forwarding.
+- SEO & Machine-Readable Discovery Optimization: Configured high-traffic `public/robots.txt` and comprehensive `/llms.txt`.
+- Structured Data: Added complete Schema.org JSON-LD graph to `index.html` featuring Organization (`TehWiz Productions` - `https://tehwiz.com`), WebApplication (`Project Yuli`), and WebSite schemas.
+- Dofollow Authority: Enforced `dofollow` link architecture (`rel="noopener"`, strictly omitting `noreferrer` and `nofollow`) across all links to `tehwiz.com` and `isicecakeoisis.com` in `index.html`, `App.tsx`, `ChatViewport.tsx`, `MemoryVaultModal.tsx`, and `ModelProgressModal.tsx`.
 
 ## Current Work Stream
-- Added `vercel.json` with full security headers, routing rewrites, and cache directives.
-- Implemented `api/model-proxy.ts` on Vercel Edge runtime, replacing `netlify/edge-functions/model-proxy.ts`.
-- Removed legacy Netlify files (`netlify.toml`, `netlify/`, `public/_headers`, `public/_redirects`).
-- Updated `src/lib/constants.ts` to reference Vercel Edge Proxy.
-- Updated `tsconfig.json` to include `api/`.
-- Validated clean typecheck (`pnpm exec tsc --noEmit`) and successful build (`pnpm build`).
+- Authored `public/robots.txt` targeting major web search engines and LLM indexing agents (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, etc.).
+- Authored `public/llms.txt` according to standard markdown LLM specifications detailing sovereign zero-cloud architecture, 4-Sides hypercube dynamics, and production team credits.
+- Added comprehensive Schema.org JSON-LD in `index.html` with Organization, WebApplication, and WebSite schemas.
+- Updated all UI components with dofollow backlinks to `tehwiz.com` and `isicecakeoisis.com`.
+- Updated `vercel.json` with explicit `text/plain` content type and caching rules for `robots.txt` and `llms.txt`.
 
 ## Recent State Changes
-- Created `vercel.json` and `api/model-proxy.ts`.
-- Removed `netlify.toml`, `netlify/edge-functions/model-proxy.ts`, `public/_headers`, `public/_redirects`.
-- Modified `src/lib/constants.ts` and `tsconfig.json`.
+- Created `public/robots.txt` and `public/llms.txt`.
+- Modified `index.html`, `src/App.tsx`, `src/components/ChatViewport.tsx`, `src/components/MemoryVaultModal.tsx`, `src/components/ModelProgressModal.tsx`, `vercel.json`.
+- Validated clean typecheck (`pnpm exec tsc --noEmit`) and successful build (`pnpm build`).
 
 ## Next Immediate Steps
-- Deploy repository to Vercel and verify Cross-Origin Isolation in browser DevTools.
-
-
+- Deploy repository to Vercel and verify Cross-Origin Isolation and crawler visibility.
