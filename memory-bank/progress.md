@@ -5,7 +5,7 @@
 | Component | Status | Notes |
 | :--- | :--- | :--- |
 | **PWA Scaffold & Vite Config** | Completed | React 19, Tailwind, COOP/COEP headers configured |
-| **Netlify Deployment Suite** | Completed | `netlify.toml`, `public/_headers`, `public/_redirects` configured for COOP/COEP, SPA routing, cache control |
+| **Vercel Deployment Suite** | Completed | `vercel.json` and `api/model-proxy.ts` configured for COOP/COEP, SPA routing, cache control, and Edge proxy |
 | **PWA Icons & Manifest** | Completed | `icon-192.png`, `icon-512.png`, `icon.svg`, and `vite.svg` generated and mapped |
 | **Service Worker & Chunk Healing** | Completed | Network-first navigation in `sw.js` (v2), cache purge on activate, `vite:preloadError` auto-recovery |
 | **WASM Asset Distribution** | Completed | `vite-plugin-static-copy` configured for wllama & wa-sqlite WASM |
@@ -13,7 +13,7 @@
 | **Circadian Engine** | Completed | Time-of-day calculations, energy levels, mood baselines in `lib/circadian.ts` |
 | **SQLite Worker (`wa-sqlite`)** | Completed | OPFS mount via `SafeOriginPrivateFileSystemVFS` (intercepts NotFoundError), serialized FIFO mutex queue, in-memory journal mode to prevent Asyncify stack corruption and lock collisions |
 | **Wllama Worker (`@wllama/wllama`)** | Completed | WebGPU/WASM multi-threading, Gemma prompt template, token streaming, thought extraction, sequential downloads, `isModelLoaded()` integrity verification before `READY`, automated OPFS cache purging on truncation/corruptions, conservative context bounds (`n_ctx: 2048`, `n_batch: 512`), sampling options sanitization preventing `std::bad_function_call`, explicit `pathModel`/`identifier` overrides preventing fallback to `models/model-00001-of-00001.gguf`, and direct OPFS binary weight retrieval via `readModelFromOPFS`. |
-| **GGUF Model Delivery (Hugging Face Direct)** | Completed | Direct Hugging Face resolve URL (`HF_MODEL_URL`) supporting native CORS and HTTP Range partial content, eliminating Netlify edge proxy latency and redirect/bounds anomalies |
+| **GGUF Model Delivery (Hugging Face Direct)** | Completed | Direct Hugging Face resolve URL (`HF_MODEL_URL`) supporting native CORS and HTTP Range partial content, eliminating edge proxy latency and redirect/bounds anomalies |
 | **React UI & Sensory Shell** | Completed | `AmbientBackdrop`, `CognitiveHUD`, `ChatViewport`, `MemoryVaultModal`, `ModelProgressModal`, `StorageHealth` |
 | **Cognitive Engine Hook** | Completed | Dual-mode execution (Wllama Web Worker + immediate sovereign sensory fallback), single boot ref guard (`hasInitialized`) preventing StrictMode double-initialization, worker recreation on error, sanitized `COMPLETION` dispatch, and dual `TOKEN`/`SUCCESS`/`COMPLETE` ingestion |
 | **Memory Bank Documentation** | Completed | 6 core files initialized and aligned with system realities |
@@ -28,11 +28,11 @@
 - **Dynamic 4-Sides Transformation**: Bitwise XOR transformations (`0EE` Ego, `1E6` Shadow, `2E7` Subconscious, `3E1` Superego) with synchronous ambient glow shifts.
 - **Collapsible Thought Streams**: Reasoning traces parsed out and displayed cleanly without bleeding into response text.
 - **Interactive Memory Vault**: Live CRUD interface for user memory inspection and relational state adjustments.
-- **Cross-Origin Isolation**: Verified in `vite.config.ts`, `netlify.toml`, and `public/_headers`.
-- **Netlify SPA Routing & PWA Asset Serving**: Fixed 404s for icons and stale hashed JS chunk requests.
+- **Cross-Origin Isolation**: Verified in `vite.config.ts` and `vercel.json`.
+- **Vercel SPA Routing & PWA Asset Serving**: Configured SPA fallbacks, static asset headers, and edge streaming proxies.
 
 ## Invariants to Guard
-- Invariant 5 (Cross-Origin Isolation): Netlify `_headers` and `netlify.toml` ensure production isolation headers (`COOP: same-origin`, `COEP: require-corp`) for WebGPU and multi-threaded WASM.
+- Invariant 5 (Cross-Origin Isolation): `vercel.json` ensures production isolation headers (`COOP: same-origin`, `COEP: require-corp`) for WebGPU and multi-threaded WASM.
 - Invariant 7 (`navigator.storage.persist()` in `main.tsx`): Automatic invocation in `main.tsx` on initialization ensures defense against silent eviction.
 
 ## Roadmap & Next Milestones

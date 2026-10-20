@@ -22,12 +22,12 @@ export const MODEL_OPTIONS = [
     description: 'Official v0.1.0 Sovereign weights via Hugging Face resolve URL (native CORS & Range requests)',
   },
   {
-    id: 'yuli-netlify-proxy',
-    name: 'Yuli 0.1.0 E2B (Netlify Edge Proxy)',
+    id: 'yuli-edge-proxy',
+    name: 'Yuli 0.1.0 E2B (Vercel Edge Proxy)',
     url: '/models/yuli.gguf',
     fileName: DEFAULT_MODEL_NAME,
     sizeLabel: '~1.5 GB',
-    description: 'Official v0.1.0 Sovereign weights streamed via Netlify 200 rewrite (bypasses browser CORS)',
+    description: 'Official v0.1.0 Sovereign weights streamed via Vercel Edge proxy (bypasses browser CORS)',
   },
   {
     id: 'yuli-github-release',

@@ -1,22 +1,24 @@
 # Active Context: Project Yuli
 
 ## Current Focus
-- Configured explicit model path and cache identifier overrides (`pathModel` / `identifier`) for Wllama to prevent fallback to generic `models/model-00001-of-00001.gguf`.
-- Added direct Origin Private File System (`readModelFromOPFS`) weight loading, allowing cached GGUF blobs and buffers to load directly without URL-string resolution.
-- Enforced target `.gguf` filename tracking across `constants.ts`, `useCognitiveEngine.ts`, `ModelProgressModal.tsx`, and `wllama.worker.ts`.
+- Migrated deployment target from Netlify to Vercel.
+- Configured `vercel.json` with Invariant 5 Cross-Origin Isolation headers (`COOP: same-origin`, `COEP: require-corp`), SPA client routing rewrites, immutable asset caching, and no-cache headers for service worker/HTML.
+- Created `api/model-proxy.ts` Edge Function to stream GGUF model chunks with HTTP Range request support and CORS forwarding.
 
 ## Current Work Stream
-- Added `readModelFromOPFS` in `src/workers/wllama.worker.ts` inspecting OPFS root, `models/`, and `cache/`.
-- Updated `loadModel` and `loadModelFromUrl` in `src/workers/wllama.worker.ts` to supply explicit `pathModel` and `identifier` matching the target filename (`yuli-0.1.0-e2b.Q4_K_M.gguf`).
-- Updated `src/hooks/useCognitiveEngine.ts` and `src/components/ModelProgressModal.tsx` to forward explicit `modelPath` and synchronize `activeModelName`.
-- Verified zero TypeScript errors (`pnpm exec tsc --noEmit`) and successful production build (`pnpm build`).
+- Added `vercel.json` with full security headers, routing rewrites, and cache directives.
+- Implemented `api/model-proxy.ts` on Vercel Edge runtime, replacing `netlify/edge-functions/model-proxy.ts`.
+- Removed legacy Netlify files (`netlify.toml`, `netlify/`, `public/_headers`, `public/_redirects`).
+- Updated `src/lib/constants.ts` to reference Vercel Edge Proxy.
+- Updated `tsconfig.json` to include `api/`.
+- Validated clean typecheck (`pnpm exec tsc --noEmit`) and successful build (`pnpm build`).
 
 ## Recent State Changes
-- Updated `src/types/index.ts`, `src/lib/constants.ts`, `src/workers/wllama.worker.ts`, `src/hooks/useCognitiveEngine.ts`, and `src/components/ModelProgressModal.tsx`.
-- Rebuilt production bundle (`dist/`).
+- Created `vercel.json` and `api/model-proxy.ts`.
+- Removed `netlify.toml`, `netlify/edge-functions/model-proxy.ts`, `public/_headers`, `public/_redirects`.
+- Modified `src/lib/constants.ts` and `tsconfig.json`.
 
 ## Next Immediate Steps
-- Push changes to origin main.
-- Verify clean model load from both remote Hugging Face URL and local OPFS file buffers.
+- Deploy repository to Vercel and verify Cross-Origin Isolation in browser DevTools.
 
 
