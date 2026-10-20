@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "@wllama/wllama": "^3.6.1",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",

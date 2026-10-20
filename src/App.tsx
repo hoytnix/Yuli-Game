@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from "@vercel/analytics/next";
 import { useCognitiveEngine } from './hooks/useCognitiveEngine';
 import { useRelationalDB } from './hooks/useRelationalDB';
 import { AmbientBackdrop } from './components/AmbientBackdrop';
@@ -67,6 +68,9 @@ export function App() {
 
   return (
     <div className="relative w-screen h-screen flex flex-col bg-[#06070a] text-slate-100 font-sans select-none overflow-hidden">
+      {/* Vercel Analytics Tracker */}
+      <Analytics />
+
       {/* Dynamic 4-Sides Ambient Glow Backdrop */}
       <AmbientBackdrop activeVector={activeVector} />
 

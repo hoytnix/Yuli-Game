@@ -14,7 +14,10 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@vercel/analytics/next": ["./node_modules/@vercel/analytics/dist/react/index.d.ts"]
+    }
   },
   "include": ["src", "api"]
 }

@@ -56,6 +56,11 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  resolve: {
+    alias: {
+      '@vercel/analytics/next': '@vercel/analytics/react',
+    },
+  },
   optimizeDeps: {
     exclude: ['@wllama/wllama', 'wa-sqlite'],
   },

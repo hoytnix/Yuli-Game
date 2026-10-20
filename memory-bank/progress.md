@@ -6,6 +6,7 @@
 | :--- | :--- | :--- |
 | **PWA Scaffold & Vite Config** | Completed | React 19, Tailwind, COOP/COEP headers configured |
 | **Vercel Deployment Suite** | Completed | `vercel.json` and `api/model-proxy.ts` configured for COOP/COEP, SPA routing, cache control, and Edge proxy |
+| **Vercel Web Analytics** | Completed | Installed `@vercel/analytics`, mapped import alias, mounted `<Analytics />` in `App.tsx` layout |
 | **SEO & LLMs Traffic Optimization** | Completed | High-authority `robots.txt`, comprehensive `/llms.txt`, full Schema.org JSON-LD graph, and dofollow backlink graph |
 | **PWA Icons & Manifest** | Completed | `icon-192.png`, `icon-512.png`, `icon.svg`, and `vite.svg` generated and mapped |
 | **Service Worker & Chunk Healing** | Completed | Network-first navigation in `sw.js` (v2), cache purge on activate, `vite:preloadError` auto-recovery |
@@ -22,6 +23,7 @@
 
 ## What Works
 - **Zero-Cloud Edge Inference**: Client-side execution via `@wllama/wllama` in dedicated worker.
+- **Client Analytics Telemetry**: Vercel Web Analytics (`<Analytics />`) mounted at root app layout to track pageviews, user engagement, and performance.
 - **Machine-Readable AI Discovery**: Standard `/llms.txt` and search-engine/AI-bot friendly `/robots.txt` serving machine-readable documentation for search engine crawlers and LLM retrieval engines.
 - **Structured Semantic Graph (JSON-LD)**: Schema.org graph for Organization (`TehWiz Productions`), WebApplication (`Project Yuli`), and WebSite with complete metadata.
 - **Dofollow External Backlinks**: All links to `tehwiz.com` and `isicecakeoisis.com` configured with `rel="noopener"` (preserving dofollow and omitting `noreferrer`).
